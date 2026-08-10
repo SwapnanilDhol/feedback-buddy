@@ -1,0 +1,15 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  swift-and-contracts:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test Swift package
+        run: swift test
+      - name: Validate contract fixtures
+        run: node contracts/validate-fixtures.mjs

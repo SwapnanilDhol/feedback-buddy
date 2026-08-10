@@ -1,0 +1,19 @@
+.build/
+.swiftpm/
+DerivedData/
+.DS_Store
+
+# Local credentials and deployment state. Never commit these.
+.env
+.env.*
+.dev.vars
+.feedback-loop.json
+*.sqlite
+*.sqlite3
+*.db
+exports/
+
+# Generated local tool output
+coverage/
+node_modules/
+dist/

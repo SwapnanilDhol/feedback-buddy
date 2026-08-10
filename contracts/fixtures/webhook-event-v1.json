@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "id": "44444444-4444-4444-8444-444444444444",
+  "type": "feedback.created",
+  "occurred_at": "2026-08-10T12:00:00.000Z",
+  "project": { "id": "my-app", "name": "My App" },
+  "data": {
+    "feedback_id": "33333333-3333-4333-8333-333333333333",
+    "category": "bug",
+    "message": "The wind card clips when gusts are shown.",
+    "reply_requested": false,
+    "context": {
+      "app_version": "5.0",
+      "build_number": "400",
+      "os_version": "26.0",
+      "locale": "en-IN",
+      "device_family": "iPhone"
+    }
+  }
+}

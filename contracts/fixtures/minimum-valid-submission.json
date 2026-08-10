@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "category": "bug",
+  "message": "The wind card clips when gusts are shown.",
+  "reply_email": null,
+  "context": {
+    "app_version": "5.0",
+    "build_number": "400",
+    "os_version": "26.0",
+    "locale": "en-IN",
+    "device_family": "iPhone"
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://feedback-loop.dev/contracts/feedback-receipt-v1.schema.json",
+  "title": "Feedback receipt v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["feedback_id", "duplicate", "delivery_status"],
+  "properties": {
+    "feedback_id": { "type": "string", "format": "uuid" },
+    "duplicate": { "type": "boolean" },
+    "delivery_status": { "type": "string", "enum": ["accepted", "complete"] }
+  }
+}
