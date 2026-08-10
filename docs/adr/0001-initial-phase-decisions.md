@@ -1,24 +1,24 @@
-# ADR 0001 — Initial product foundation decisions
+# ADR 0001 — Package foundation decisions
 
 Date: 2026-08-10
 
-Status: Provisional, pending product-owner approval
+Status: Accepted for the current foundation
 
 ## Context
 
-The implementation workspace was created empty from Plan 0004. The plan requires a separate repository/workspace and identifies several product decisions that must not be silently finalized during extraction.
+The project needs a small, independently usable client foundation before the reusable UI and backend are added. These decisions establish the compatibility boundary without coupling the SDK to a hosting provider or a host application's internal architecture.
 
 ## Decisions for this implementation slice
 
-- Use `FeedbackLoop` as an internal Swift package/repository working name only. No package or npm artifact is published under this name.
-- Start with `FeedbackCore` only. `FeedbackUI`, `FeedbackSFK`, the Worker, and the installer remain separate phase deliverables.
-- Target Swift 6, iOS 17, and macOS 14 for package validation, matching the plan's recommended defaults.
-- Keep the protocol fixtures platform-neutral JSON. The eventual Worker and installer will consume the same files.
+- Use `FeedbackCore` as the first public Swift module. UI, hosting, and installer concerns remain separate modules.
+- Target Swift 6, iOS 17, and macOS 14 for package validation.
+- Keep protocol fixtures as platform-neutral JSON shared by future client and server implementations.
+- Keep the transport backend-independent. Cloudflare may provide a reference backend, but it is not a client dependency.
 
 ## Not decided
 
-Product ownership, public naming/domains, organization and npm scope, licenses, public/private repository status, reply-email default, retention policy, admin surface, multi-project installer UX, Deploy Button launch status, and commercial follow-up remain open as listed in Plan 0004 §23.
+The next releases still need product decisions for the final name, licensing, supported destinations, retention defaults, administrative surface, and installer UX. Those choices should be documented before they become release or deployment behavior.
 
 ## Consequences
 
-The current package is intentionally safe to rename before publication. Later phases must add an amendment or ADR before making any of the open decisions part of a generated project, public docs, or release artifact.
+The current package keeps those concerns behind stable seams so later decisions do not require changing the core submission contract.
