@@ -4,8 +4,27 @@
     {
       "name": "feedback-buddy-server",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["--prefix", "server", "run", "dev", "--", "--port", "8787"],
+      "runtimeArgs": [
+        "--prefix",
+        "server",
+        "run",
+        "dev",
+        "--",
+        "--port",
+        "8787"
+      ],
       "port": 8787
+    },
+    {
+      "name": "dashboard-dev",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "--prefix",
+        "dashboard",
+        "run",
+        "dev"
+      ],
+      "port": 3000
     }
   ]
 }
