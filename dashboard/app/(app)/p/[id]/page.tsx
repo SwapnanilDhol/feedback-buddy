@@ -28,17 +28,20 @@ export default async function InboxPage({ params, searchParams }: { params: Prom
   const statusParam = search.status === undefined ? "open" : search.status;
   const status = (["open", ...statuses] as string[]).includes(statusParam) ? (statusParam as StatusFilter) : undefined;
   const category = categories.includes(search.category as Category) ? (search.category as Category) : undefined;
+  const listPromise = api.feedbackList(id, { status, category, app_version: search.app_version, q: search.q, cursor: search.cursor, limit: 50 }).catch((error: unknown) => error);
   let project;
+  let versions: string[];
   try {
-    project = (await api.project(id)).project;
+    const detail = await api.project(id);
+    project = detail.project;
+    versions = detail.app_versions;
   } catch (error) {
     if (error instanceof ApiError && error.status === 404) notFound();
     throw error;
   }
-  const [{ feedback, next_cursor }, versions] = await Promise.all([
-    api.feedbackList(id, { status, category, app_version: search.app_version, q: search.q, cursor: search.cursor, limit: 50 }),
-    api.feedbackList(id, { limit: 100 }).then((r) => [...new Set(r.feedback.map((item) => item.context.app_version))].sort().reverse()),
-  ]);
+  const listed = await listPromise;
+  if (listed instanceof Error) throw listed;
+  const { feedback, next_cursor } = listed as Awaited<ReturnType<typeof api.feedbackList>>;
   const filtered = Boolean((status && status !== "open") || category || search.app_version || search.q);
   const older = new URLSearchParams();
   if (statusParam !== "open") older.set("status", statusParam);

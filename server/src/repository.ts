@@ -114,19 +114,23 @@ export async function readProject(db: D1Database, id: string): Promise<Project |
 }
 
 export async function listProjects(db: D1Database): Promise<Array<Project & { counts: ProjectCounts }>> {
-  const { results } = await db
-    .prepare(
-      `SELECT p.*,
-         (SELECT COUNT(*) FROM feedback f WHERE f.project_id = p.id AND f.status = 'todo') AS count_todo,
-         (SELECT COUNT(*) FROM feedback f WHERE f.project_id = p.id AND f.status = 'in_progress') AS count_in_progress,
-         (SELECT COUNT(*) FROM feedback f WHERE f.project_id = p.id AND f.status = 'done') AS count_done,
-         (SELECT COUNT(*) FROM feedback f WHERE f.project_id = p.id AND f.status = 'wont_do') AS count_wont_do
-       FROM projects p ORDER BY p.created_at ASC`,
-    )
-    .all<ProjectRow & { count_todo: number; count_in_progress: number; count_done: number; count_wont_do: number }>();
-  return results.map((row) => ({
+  // One grouped scan for every project's counts instead of four correlated
+  // subqueries per project; both queries run in a single D1 batch.
+  const results = await db.batch([
+    db.prepare('SELECT * FROM projects ORDER BY created_at ASC'),
+    db.prepare('SELECT project_id, status, COUNT(*) AS n FROM feedback GROUP BY project_id, status'),
+  ]);
+  const projects = results[0];
+  const counts = results[1];
+  const byProject = new Map<string, ProjectCounts>();
+  for (const row of (counts?.results ?? []) as Array<{ project_id: string; status: string; n: number }>) {
+    const entry = byProject.get(row.project_id) ?? { todo: 0, in_progress: 0, done: 0, wont_do: 0 };
+    if (row.status in entry) entry[row.status as keyof ProjectCounts] = row.n;
+    byProject.set(row.project_id, entry);
+  }
+  return ((projects?.results ?? []) as ProjectRow[]).map((row) => ({
     ...toProject(row),
-    counts: { todo: row.count_todo, in_progress: row.count_in_progress, done: row.count_done, wont_do: row.count_wont_do },
+    counts: byProject.get(row.id) ?? { todo: 0, in_progress: 0, done: 0, wont_do: 0 },
   }));
 }
 

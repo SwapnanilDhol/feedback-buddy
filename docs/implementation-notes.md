@@ -159,3 +159,17 @@ Known gaps:
   served platform 404s), and Vercel Authentication was switched off because
   the app has its own login. Production: https://feedback-buddy.vercel.app.
 - The Worker's SSR dashboard stays as a fallback at the workers.dev host.
+
+## Dashboard load time — 2026-11-07
+
+- Measured with a forged operator session: overview 1.3–1.5 s TTFB, other
+  pages ~0.65 s, Vercel function in `iad1` with the Worker's D1 in APAC.
+- Fixes: `vercel.json` pins functions to `bom1`; new `GET /api/v1/overview`
+  (projects + counts, stats, latest) replaces one call per app; the sidebar
+  and overview share that single call through React `cache()`; inbox and
+  detail fetch in parallel; `app_versions` ride on the project payload; the
+  sidebar streams behind Suspense; `images.unoptimized` so the metered Vercel
+  image optimizer is never used (icons are plain `<img>`); `listProjects`
+  uses one grouped count query in a D1 batch.
+- After: warm pages 150–200 ms TTFB, ~300 ms complete; cold starts remain on
+  the Hobby tier.

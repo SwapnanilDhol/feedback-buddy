@@ -1,4 +1,5 @@
 import "server-only";
+import { cache } from "react";
 
 export type Category = "feedback" | "bug" | "idea";
 export type Status = "todo" | "in_progress" | "done" | "wont_do";
@@ -145,10 +146,25 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
   return (text ? JSON.parse(text) : {}) as T;
 }
 
+export interface OverviewStats {
+  open: number;
+  todo: number;
+  open_bugs: number;
+  last_7_days: number;
+  awaiting_reply: number;
+}
+
 export const api = {
-  projects: () => request<{ projects: ProjectWithCounts[] }>("GET", "/api/v1/projects").then((r) => r.projects),
-  project: (id: string) =>
-    request<{ project: Project; keys: ApiKey[]; destinations: Destination[] }>("GET", `/api/v1/projects/${id}`),
+  /**
+   * One round trip per request for everything the shell needs: the sidebar
+   * (projects) and the overview page share this call via React's per-request
+   * cache, so no page ever fetches the project list twice.
+   */
+  overview: cache(() =>
+    request<{ projects: ProjectWithCounts[]; stats: OverviewStats; latest: Feedback[] }>("GET", "/api/v1/overview?limit=12")),
+  projects: cache(async () => (await api.overview()).projects),
+  project: cache((id: string) =>
+    request<{ project: Project; keys: ApiKey[]; destinations: Destination[]; app_versions: string[] }>("GET", `/api/v1/projects/${id}`)),
   createProject: (input: { name: string; bundle_id?: string | null; retention_days?: number }) =>
     request<{ project: Project; public_key: string }>("POST", "/api/v1/projects", input),
   updateProject: (id: string, patch: { name?: string; bundle_id?: string | null; retention_days?: number }) =>
@@ -167,7 +183,7 @@ export const api = {
     for (const [key, value] of Object.entries(query)) if (value !== undefined && value !== "") params.set(key, String(value));
     return request<{ feedback: Feedback[]; next_cursor: string | null }>("GET", `/api/v1/projects/${id}/feedback?${params}`);
   },
-  feedback: (fid: string) => request<{ feedback: Feedback; deliveries: Delivery[] }>("GET", `/api/v1/feedback/${fid}`),
+  feedback: cache((fid: string) => request<{ feedback: Feedback; deliveries: Delivery[] }>("GET", `/api/v1/feedback/${fid}`)),
   updateFeedback: (fid: string, patch: { status?: Status; internal_note?: string | null }) =>
     request<{ feedback: Feedback }>("PATCH", `/api/v1/feedback/${fid}`, patch),
   deleteFeedback: (fid: string) => request<{ ok: true }>("DELETE", `/api/v1/feedback/${fid}`),

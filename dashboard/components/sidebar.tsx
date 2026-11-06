@@ -69,3 +69,17 @@ export function Sidebar({ projects }: { projects: ProjectWithCounts[] }) {
     </aside>
   );
 }
+
+/** Same footprint as the real sidebar, shown while projects load. */
+export function SidebarSkeleton() {
+  return (
+    <aside className="shrink-0 border-b border-border bg-card px-3 pt-6 pb-4 md:sticky md:top-0 md:h-screen md:w-[232px] md:border-r md:border-b-0" aria-hidden="true">
+      <div className="px-2 pb-5 text-sm font-semibold">FeedbackBuddy</div>
+      <div className="space-y-1.5 px-2">
+        {Array.from({ length: 8 }).map((_, index) => (
+          <div key={index} className="h-6 w-full animate-pulse rounded-md bg-muted" style={{ width: `${70 - (index % 3) * 10}%` }} />
+        ))}
+      </div>
+    </aside>
+  );
+}

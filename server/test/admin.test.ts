@@ -178,3 +178,17 @@ describe('DELETE feedback', () => {
     expect((await call(`/api/v1/feedback/${body.feedback_id}`, { method: 'DELETE', headers: adminHeaders })).status).toBe(404);
   });
 });
+
+describe('overview endpoint', () => {
+  it('returns projects with counts, stats, latest feedback, and app versions per project', async () => {
+    const project = await createProject('Overview Project');
+    await submit(project.public_key, { ...validSubmission, context: { ...validSubmission.context, app_version: '9.9' } }, { 'X-Feedback-Installation-ID': crypto.randomUUID() });
+    const overview = await callJson<{ projects: Array<{ id: string; counts: { todo: number } }>; stats: { open: number; todo: number; open_bugs: number; last_7_days: number; awaiting_reply: number }; latest: Array<{ key: string; project_id: string }> }>('/api/v1/overview', { headers: adminHeaders });
+    expect(overview.status).toBe(200);
+    expect(overview.body.projects.find((item) => item.id === project.id)?.counts.todo).toBe(1);
+    expect(overview.body.stats.open).toBeGreaterThanOrEqual(1);
+    expect(overview.body.latest.some((item) => item.project_id === project.id)).toBe(true);
+    const detail = await callJson<{ app_versions: string[] }>(`/api/v1/projects/${project.id}`, { headers: adminHeaders });
+    expect(detail.body.app_versions).toEqual(['9.9']);
+  });
+});

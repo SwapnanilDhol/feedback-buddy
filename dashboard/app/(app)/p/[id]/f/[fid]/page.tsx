@@ -35,6 +35,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
 
 export default async function FeedbackPage({ params }: { params: Promise<{ id: string; fid: string }> }) {
   const { id, fid } = await params;
+  const projectPromise = api.project(id).catch((error: unknown) => error);
   let data;
   try {
     data = await api.feedback(fid);
@@ -44,7 +45,9 @@ export default async function FeedbackPage({ params }: { params: Promise<{ id: s
   }
   const { feedback, deliveries } = data;
   if (feedback.project_id !== id) notFound();
-  const project = (await api.project(id)).project;
+  const projectResult = await projectPromise;
+  if (projectResult instanceof Error) throw projectResult;
+  const project = (projectResult as Awaited<ReturnType<typeof api.project>>).project;
   const mailto = feedback.reply_email
     ? `mailto:${encodeURIComponent(feedback.reply_email)}?subject=${encodeURIComponent(`Re: your ${project.name} feedback ${feedback.key}`)}`
     : null;

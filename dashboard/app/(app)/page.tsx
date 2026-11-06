@@ -5,13 +5,10 @@ import { AppIcon } from "@/components/app-icon";
 import { IssueRow } from "@/components/issue-row";
 import { PageHeader } from "@/components/page-header";
 import { Card } from "@/components/ui/card";
-import { api, type Feedback, type ProjectWithCounts } from "@/lib/api";
+import { api, type ProjectWithCounts } from "@/lib/api";
 
 export const metadata: Metadata = { title: "Overview" };
 
-function weekAgoMs(): number {
-  return Date.now() - 7 * 24 * 60 * 60 * 1000;
-}
 
 function Stat({ label, value, tone }: { label: string; value: number; tone?: "accent" | "warn" }) {
   const color = tone === "accent" && value > 0 ? "text-blue-600 dark:text-blue-400" : tone === "warn" && value > 0 ? "text-red-600 dark:text-red-400" : "";
@@ -24,20 +21,9 @@ function Stat({ label, value, tone }: { label: string; value: number; tone?: "ac
 }
 
 export default async function OverviewPage() {
-  const projects = await api.projects();
-  const lists = await Promise.all(projects.map((project) => api.feedbackList(project.id, { limit: 50 }).then((r) => r.feedback)));
-  const all = lists.flat();
+  const { projects, stats: server, latest } = await api.overview();
   const byId = new Map(projects.map((project) => [project.id, project]));
-  const weekAgo = weekAgoMs();
-  const open = (item: Feedback) => item.status === "todo" || item.status === "in_progress";
-  const stats = {
-    open: projects.reduce((sum, project) => sum + project.counts.todo + project.counts.in_progress, 0),
-    todo: projects.reduce((sum, project) => sum + project.counts.todo, 0),
-    openBugs: all.filter((item) => item.category === "bug" && open(item)).length,
-    week: all.filter((item) => Date.parse(item.created_at) >= weekAgo).length,
-    awaitingReply: all.filter((item) => open(item) && item.reply_email).length,
-  };
-  const latest = all.sort((a, b) => b.created_at.localeCompare(a.created_at)).slice(0, 12);
+  const stats = { open: server.open, todo: server.todo, openBugs: server.open_bugs, week: server.last_7_days, awaitingReply: server.awaiting_reply };
 
   return (
     <>

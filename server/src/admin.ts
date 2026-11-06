@@ -24,10 +24,13 @@ import {
   deleteFeedback,
   insertApiKey,
   listApiKeys,
+  listAppVersions,
   listDeliveriesWithKinds,
   listDestinations,
   listFeedback,
+  listLatestFeedback,
   listProjects,
+  overviewStats,
   readDestination,
   readFeedback,
   readProject,
@@ -130,11 +133,23 @@ admin.post('/projects', async (context) => {
 
 admin.get('/projects/:id', async (context) => {
   const project = await loadProject(context.env, context.req.param('id'));
-  const [keys, destinations] = await Promise.all([
+  const [keys, destinations, appVersions] = await Promise.all([
     listApiKeys(context.env.DB, project.id),
     listDestinations(context.env.DB, project.id),
+    listAppVersions(context.env.DB, project.id),
   ]);
-  return context.json({ project, keys, destinations: destinations.map(toDestination) });
+  return context.json({ project, keys, destinations: destinations.map(toDestination), app_versions: appVersions });
+});
+
+/** Everything the overview screen needs in one round trip. */
+admin.get('/overview', async (context) => {
+  const limit = Math.min(Math.max(Number(context.req.query('limit') ?? 12) || 12, 1), 50);
+  const [projects, stats, latest] = await Promise.all([
+    listProjects(context.env.DB),
+    overviewStats(context.env.DB),
+    listLatestFeedback(context.env.DB, limit),
+  ]);
+  return context.json({ projects, stats, latest: latest.map((row) => toFeedback(row, adminAttachmentUrl)) });
 });
 
 admin.patch('/projects/:id', async (context) => {
