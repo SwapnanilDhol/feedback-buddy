@@ -17,6 +17,7 @@ export default defineConfig(async () => {
             ADMIN_PASSWORD: 'test-password',
             SESSION_SECRET: 'test-session-secret-0123456789abcdef0123456789',
             ADMIN_API_TOKEN: 'fb_admin_test-token',
+            ALLOWED_RP_IDS: 'dash.example.test',
           },
         },
       }),

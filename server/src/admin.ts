@@ -1,7 +1,17 @@
 import { Hono } from 'hono';
 
 import { adminAttachmentUrl, streamAttachment } from './attachments';
-import { requireAdmin } from './auth';
+import { requireAdmin, verifyPassword } from './auth';
+import {
+  authenticationOptions,
+  completeAuthentication,
+  completeRegistration,
+  deletePasskey,
+  listPasskeys,
+  registrationOptions,
+  toPasskey,
+  type RelyingParty,
+} from './passkeys';
 import { type Mailer, deliverFeedback, destinationAccepts, sampleFeedback, sendEmailNotification, sendToDestination } from './delivery';
 import { ApiError, isUuid, publicBaseUrl, readLimitedRequestJson } from './http';
 import { generatePublicKey } from './keys';
@@ -238,3 +248,94 @@ admin.post('/feedback/:feedbackId/redeliver', async (context) => {
 
 /** Shared by the dashboard: decide whether a destination would receive a category. */
 export { destinationAccepts };
+
+// ----- Operator auth for external dashboards -----
+// A separate front end (the Next.js dashboard) keeps its own session and asks
+// the Worker to check the password or run the WebAuthn ceremonies. The relying
+// party is the dashboard's own host, so it must be on the allow-list.
+
+const hostnamePattern = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*$/i;
+
+function allowedRelyingParty(context: { env: Env; req: { url: string } }, body: Record<string, unknown>): RelyingParty {
+  const rpId = typeof body.rp_id === 'string' ? body.rp_id.trim().toLowerCase() : '';
+  const origin = typeof body.origin === 'string' ? body.origin.trim() : '';
+  if (!hostnamePattern.test(rpId) || rpId.length > 253) throw new ApiError(422, 'invalid_rp_id');
+  let originUrl: URL;
+  try {
+    originUrl = new URL(origin);
+  } catch {
+    throw new ApiError(422, 'invalid_origin');
+  }
+  const host = originUrl.hostname.toLowerCase();
+  if (host !== rpId && !host.endsWith(`.${rpId}`)) throw new ApiError(422, 'origin_rp_mismatch');
+  if (originUrl.protocol !== 'https:' && rpId !== 'localhost') throw new ApiError(422, 'origin_not_https');
+  const own = new URL(context.req.url).hostname.toLowerCase();
+  const allowed = new Set([own, 'localhost', ...(context.env.ALLOWED_RP_IDS ?? '').split(',').map((value) => value.trim().toLowerCase()).filter(Boolean)]);
+  if (!allowed.has(rpId)) throw new ApiError(403, 'rp_not_allowed');
+  return { rpID: rpId, origin: originUrl.origin };
+}
+
+function requiredString(body: Record<string, unknown>, field: string, max = 4096): string {
+  const value = body[field];
+  if (typeof value !== 'string' || value.length === 0 || value.length > max) throw new ApiError(422, `invalid_${field}`);
+  return value;
+}
+
+function credentialBody(value: unknown): Record<string, unknown> & { id: string } {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new ApiError(422, 'invalid_credential');
+  const record = value as Record<string, unknown>;
+  if (typeof record.id !== 'string' || record.id.length === 0 || record.id.length > 1024) throw new ApiError(422, 'invalid_credential');
+  return record as Record<string, unknown> & { id: string };
+}
+
+admin.post('/auth/password', async (context) => {
+  const body = await readLimitedRequestJson(context.req.raw, 4 * 1024);
+  const password = typeof body.password === 'string' ? body.password : '';
+  if (!verifyPassword(password, context.env)) throw new ApiError(401, 'invalid_password');
+  return context.json({ ok: true });
+});
+
+admin.get('/auth/passkeys', async (context) => {
+  const rows = await listPasskeys(context.env.DB);
+  return context.json({ passkeys: rows.map(toPasskey) });
+});
+
+admin.post('/auth/passkeys/registration-options', async (context) => {
+  const body = await readLimitedRequestJson(context.req.raw, 4 * 1024);
+  const party = allowedRelyingParty(context, body);
+  return context.json(await registrationOptions(context.env.DB, party));
+});
+
+admin.post('/auth/passkeys', async (context) => {
+  const body = await readLimitedRequestJson(context.req.raw, 64 * 1024);
+  const party = allowedRelyingParty(context, body);
+  const challenge = requiredString(body, 'challenge', 512);
+  const name = (typeof body.name === 'string' ? body.name : '').trim().slice(0, 60) || 'Passkey';
+  const credential = credentialBody(body.response);
+  const passkey = await completeRegistration(context.env.DB, party, challenge, name, credential as unknown as Parameters<typeof completeRegistration>[4]);
+  if (!passkey) throw new ApiError(422, 'passkey_rejected');
+  return context.json({ passkey }, 201);
+});
+
+admin.delete('/auth/passkeys/:id', async (context) => {
+  const removed = await deletePasskey(context.env.DB, context.req.param('id'));
+  if (!removed) throw new ApiError(404, 'passkey_not_found');
+  return context.json({ ok: true });
+});
+
+admin.post('/auth/passkeys/authentication-options', async (context) => {
+  const body = await readLimitedRequestJson(context.req.raw, 4 * 1024);
+  const party = allowedRelyingParty(context, body);
+  if ((await listPasskeys(context.env.DB)).length === 0) throw new ApiError(404, 'no_passkeys');
+  return context.json(await authenticationOptions(context.env.DB, party));
+});
+
+admin.post('/auth/passkeys/authenticate', async (context) => {
+  const body = await readLimitedRequestJson(context.req.raw, 64 * 1024);
+  const party = allowedRelyingParty(context, body);
+  const challenge = requiredString(body, 'challenge', 512);
+  const credential = credentialBody(body.response);
+  const passkey = await completeAuthentication(context.env.DB, party, challenge, credential as unknown as Parameters<typeof completeAuthentication>[3]);
+  if (!passkey) throw new ApiError(401, 'passkey_rejected');
+  return context.json({ ok: true, passkey: { id: passkey.id, name: passkey.name } });
+});

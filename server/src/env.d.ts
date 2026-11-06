@@ -11,6 +11,8 @@ declare namespace Cloudflare {
     /** Cloudflare Email Sending binding; absent in tests and when not configured. */
     EMAIL?: SendEmail;
     EMAIL_FROM?: string;
+    /** Comma-separated extra WebAuthn relying-party hosts (external dashboards). */
+    ALLOWED_RP_IDS?: string;
   }
 }
 

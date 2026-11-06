@@ -8,7 +8,8 @@
   "vars": {
     "ENVIRONMENT": "production",
     "PUBLIC_BASE_URL": "https://feedback-buddy.swapnanildhol.workers.dev",
-    "EMAIL_FROM": "feedback-buddy@swapnanildhol.com"
+    "EMAIL_FROM": "feedback-buddy@swapnanildhol.com",
+    "ALLOWED_RP_IDS": "feedback-buddy.vercel.app,feedback-buddy-swapnanildhols-projects.vercel.app"
   },
   // Email destinations use Cloudflare Email Sending. The sender must be on a
   // domain with Email Routing enabled; recipients must be verified addresses.
