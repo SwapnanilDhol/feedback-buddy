@@ -87,6 +87,9 @@ a.r:hover { background: var(--hover); }
 .pill.delivered { color: var(--closed); } .pill.pending { color: var(--triaged); } .pill.failed, .pill.exhausted { color: var(--danger); } .pill.off { color: var(--muted); }
 .badge-select { display: inline-flex; align-items: center; gap: 8px; height: var(--control); padding: 0 10px; border: 1px solid var(--line-2); border-radius: var(--radius-s); background: var(--panel); }
 .badge-select select { width: auto; height: auto; border: 0; padding: 0 22px 0 0; background-color: transparent; font-weight: 500; font-size: 13.5px; background-position: right 4px center, right 0 center; }
+.badge-select select:focus-visible { outline: none; }
+.badge-select:focus-within { outline: 2px solid var(--focus); outline-offset: 1px; }
+select:focus:not(:focus-visible), input:focus:not(:focus-visible) { outline: none; }
 .key { font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--muted); white-space: nowrap; letter-spacing: 0; }
 .issue { display: grid; grid-template-columns: 16px 64px minmax(0, 1fr) auto; gap: 10px; align-items: center; min-height: 44px; padding: 0 20px; color: var(--ink); }
 .issue:hover { background: var(--hover); }
@@ -265,6 +268,10 @@ const script = `
     }
     var confirmable = target.closest('[data-confirm]');
     if (confirmable && !window.confirm(confirmable.getAttribute('data-confirm'))) { event.preventDefault(); }
+  });
+
+  document.addEventListener('change', function (event) {
+    if (event.target instanceof HTMLSelectElement) event.target.blur();
   });
 
   window.fbEnhance = function (root) {
