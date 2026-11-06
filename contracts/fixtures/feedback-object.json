@@ -1,8 +1,10 @@
 {
   "id": "33333333-3333-4333-8333-333333333333",
+  "key": "MYA-1",
+  "number": 1,
   "project_id": "prj_01jcexample",
   "category": "bug",
-  "status": "new",
+  "status": "todo",
   "message": "The wind card clips when gusts are shown.",
   "name": null,
   "reply_email": null,

@@ -2,6 +2,7 @@ import { raw } from 'hono/html';
 import type { FC, PropsWithChildren } from 'hono/jsx';
 
 import type { Project, ProjectCounts } from '../repository';
+import { statusLabels, type Status } from '../schema';
 
 // ---------------------------------------------------------------------------
 // Design tokens. One neutral palette, one accent, a 4px spacing scale, and a
@@ -13,13 +14,13 @@ const stylesheet = `
   color-scheme: light dark;
   --bg: #fafafa; --panel: #ffffff; --hover: #f4f4f4; --ink: #121212; --ink-2: #4a4a4a; --muted: #7a7a7a; --line: #e7e7e7; --line-2: #d9d9d9;
   --accent: #121212; --accent-ink: #ffffff; --link: #1f5eff; --focus: #1f5eff;
-  --new: #1f5eff; --triaged: #c77d00; --closed: #1f8a4c; --danger: #d2362b;
+  --new: #1f5eff; --triaged: #c77d00; --closed: #1f8a4c; --done: #6e56cf; --danger: #d2362b;
   --radius: 10px; --radius-s: 7px; --control: 32px; --side: 232px;
 }
 @media (prefers-color-scheme: dark) { :root {
   --bg: #111111; --panel: #171717; --hover: #1f1f1f; --ink: #ececec; --ink-2: #bdbdbd; --muted: #8f8f8f; --line: #262626; --line-2: #333333;
   --accent: #ececec; --accent-ink: #111111; --link: #7aa2ff; --focus: #7aa2ff;
-  --new: #7aa2ff; --triaged: #e2a33a; --closed: #5fc38a; --danger: #ff6b5e;
+  --new: #7aa2ff; --triaged: #e2a33a; --closed: #5fc38a; --done: #a394f0; --danger: #ff6b5e;
 } }
 
 * { box-sizing: border-box; }
@@ -77,11 +78,25 @@ a.r:hover { background: var(--hover); }
 .r .end { display: flex; gap: 14px; align-items: center; justify-content: flex-end; font-size: 12.5px; color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
 .empty { padding: 36px 20px; text-align: center; color: var(--muted); font-size: 13.5px; }
 
-/* Status + category as text with a dot. Class names stay (new/triaged/closed) for the API and tests. */
-.pill { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--muted); white-space: nowrap; }
-.pill::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; opacity: .9; }
-.pill.new { color: var(--new); } .pill.triaged { color: var(--triaged); } .pill.closed { color: var(--closed); }
+/* Workflow status badges (Linear-style icon + label). */
+.pill { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--muted); white-space: nowrap; line-height: 1; }
+.pill svg { width: 14px; height: 14px; flex: none; }
+.pill.todo { color: var(--muted); } .pill.in_progress { color: var(--triaged); } .pill.done { color: var(--done); } .pill.wont_do { color: var(--muted); }
+.pill.delivered, .pill.pending, .pill.failed, .pill.exhausted, .pill.off { padding-left: 13px; position: relative; }
+.pill.delivered::before, .pill.pending::before, .pill.failed::before, .pill.exhausted::before, .pill.off::before { content: ""; position: absolute; left: 0; top: 50%; margin-top: -3.5px; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
 .pill.delivered { color: var(--closed); } .pill.pending { color: var(--triaged); } .pill.failed, .pill.exhausted { color: var(--danger); } .pill.off { color: var(--muted); }
+.badge-select { display: inline-flex; align-items: center; gap: 8px; height: var(--control); padding: 0 10px; border: 1px solid var(--line-2); border-radius: var(--radius-s); background: var(--panel); }
+.badge-select select { width: auto; height: auto; border: 0; padding: 0 22px 0 0; background-color: transparent; font-weight: 500; font-size: 13.5px; background-position: right 4px center, right 0 center; }
+.key { font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--muted); white-space: nowrap; letter-spacing: 0; }
+.issue { display: grid; grid-template-columns: 16px 64px minmax(0, 1fr) auto; gap: 10px; align-items: center; min-height: 44px; padding: 0 20px; color: var(--ink); }
+.issue:hover { background: var(--hover); }
+.issue .pill { gap: 0; } .issue .pill svg { width: 15px; height: 15px; }
+.issue .title { font-size: 14px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.issue .title .who { color: var(--muted); font-weight: 400; }
+.issue .title .icon { vertical-align: -5px; margin-right: 6px; }
+.issue .end { display: flex; align-items: center; gap: 12px; font-size: 12.5px; color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.issue .end .img { width: 14px; height: 14px; opacity: .7; }
+.rows > li.issue-row { border-top: 1px solid var(--line); }
 .cat { font-size: 12.5px; color: var(--muted); text-transform: capitalize; display: inline-flex; align-items: center; gap: 6px; }
 .cat .dot.feedback { background: var(--new); } .cat .dot.bug { background: var(--danger); } .cat .dot.idea { background: var(--triaged); }
 
@@ -209,6 +224,10 @@ dt { color: var(--muted); } dd { margin: 0; overflow-wrap: anywhere; }
   .panel > .pad, .rows .r, .facts > div { padding-left: 16px; padding-right: 16px; }
   .panel-head { padding: 8px 16px; }
   .rows .r { grid-template-columns: minmax(0, 1fr) !important; row-gap: 6px; }
+  .issue { grid-template-columns: 16px minmax(0, 1fr); padding: 10px 16px; row-gap: 4px; }
+  .issue .key { display: none; }
+  .issue .title { white-space: normal; }
+  .issue .end { grid-column: 2; }
   .stream .r { grid-template-columns: 20px minmax(0, 1fr) !important; }
   .r .end { grid-column: 1 / -1; justify-content: flex-start; gap: 10px; flex-wrap: wrap; }
   .stream .r .end { grid-column: 2; }
@@ -433,6 +452,35 @@ export const AppIcon: FC<{ project: Pick<Project, 'slug' | 'name' | 'icon_url'>;
   </span>
 );
 
+const StatusIcon: FC<{ status: Status }> = ({ status }) => {
+  switch (status) {
+    case 'todo':
+      return (
+        <svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-dasharray="2.5 2.2" /></svg>
+      );
+    case 'in_progress':
+      return (
+        <svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="1.6" /><path d="M8 8V2.6A5.4 5.4 0 0 1 13.4 8Z" fill="currentColor" /></svg>
+      );
+    case 'done':
+      return (
+        <svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.6" fill="currentColor" /><path d="M5 8.2l2 2 4-4.4" fill="none" stroke="var(--panel)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" /></svg>
+      );
+    case 'wont_do':
+      return (
+        <svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="1.6" /><path d="M5.6 5.6l4.8 4.8M10.4 5.6l-4.8 4.8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" /></svg>
+      );
+  }
+};
+
+/** Icon + label for a workflow status; `iconOnly` for dense rows. */
+export const StatusBadge: FC<{ status: Status; iconOnly?: boolean }> = ({ status, iconOnly }) => (
+  <span class={`pill ${status}`} title={statusLabels[status]}>
+    <StatusIcon status={status} />
+    {iconOnly ? null : <span>{statusLabels[status]}</span>}
+  </span>
+);
+
 export const BackLink: FC<{ href: string; label: string }> = ({ href, label }) => (
   <a class="back" href={href}>
     <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3 5 8l5 5" /></svg>
@@ -487,7 +535,7 @@ export const Layout: FC<PropsWithChildren<LayoutProps>> = ({ title, projects, ac
               <a href={`/p/${project.id}`} class={project.id === activeProjectId ? 'active' : ''} title={project.name}>
                 <AppIcon project={project} />
                 <span class="name">{project.name}</span>
-                <span class={`n ${project.counts.new > 0 ? 'has' : ''}`}>{project.counts.new > 0 ? project.counts.new : ''}</span>
+                <span class={`n ${project.counts.todo > 0 ? 'has' : ''}`}>{project.counts.todo > 0 ? project.counts.todo : ''}</span>
               </a>
             ))}
             <a href="/apps/new" class={`new-app ${activeNav === 'new' ? 'active' : ''}`}>

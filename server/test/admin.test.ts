@@ -33,8 +33,10 @@ describe('admin API', () => {
     expect(JSON.stringify(detail.body)).not.toContain(created.body.public_key);
 
     await submit(created.body.public_key);
-    const list = await callJson<{ projects: Array<{ id: string; counts: { new: number } }> }>('/api/v1/projects', { headers: adminHeaders });
-    expect(list.body.projects.find((project) => project.id === created.body.project.id)?.counts.new).toBe(1);
+    const list = await callJson<{ projects: Array<{ id: string; key: string; counts: { todo: number } }> }>('/api/v1/projects', { headers: adminHeaders });
+    const listed = list.body.projects.find((project) => project.id === created.body.project.id);
+    expect(listed?.counts.todo).toBe(1);
+    expect(listed?.key).toMatch(/^[A-Z0-9]{2,6}$/);
 
     const duplicateSlug = await callJson<{ project: { slug: string } }>('/api/v1/projects', jsonInit('POST', { name: 'Goaley: Savings Goal Tracker' }));
     expect(duplicateSlug.body.project.slug).toBe('goaley-savings-goal-tracker-2');
@@ -92,11 +94,12 @@ describe('admin API', () => {
   it('updates status and notes', async () => {
     const project = await createProject();
     const { body } = await submit(project.public_key);
-    const patched = await callJson<{ feedback: Feedback }>(`/api/v1/feedback/${body.feedback_id}`, jsonInit('PATCH', { status: 'triaged', internal_note: 'Reproduced on 26.0' }));
+    const patched = await callJson<{ feedback: Feedback }>(`/api/v1/feedback/${body.feedback_id}`, jsonInit('PATCH', { status: 'in_progress', internal_note: 'Reproduced on 26.0' }));
     expect(patched.status).toBe(200);
-    expect(patched.body.feedback.status).toBe('triaged');
+    expect(patched.body.feedback.status).toBe('in_progress');
+    expect(patched.body.feedback.key).toMatch(/^[A-Z0-9]{2,6}-1$/);
     expect(patched.body.feedback.internal_note).toBe('Reproduced on 26.0');
-    expect((await callJson(`/api/v1/feedback/${body.feedback_id}`, jsonInit('PATCH', { status: 'done' }))).status).toBe(422);
+    expect((await callJson(`/api/v1/feedback/${body.feedback_id}`, jsonInit('PATCH', { status: 'closed' }))).status).toBe(422);
     expect((await callJson(`/api/v1/feedback/${body.feedback_id}`, jsonInit('PATCH', {}))).status).toBe(422);
     expect((await call(`/api/v1/feedback/${crypto.randomUUID()}`, { headers: adminHeaders })).status).toBe(404);
   });

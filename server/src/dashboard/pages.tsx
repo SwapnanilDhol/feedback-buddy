@@ -3,9 +3,9 @@ import type { FC } from 'hono/jsx';
 import type { Passkey } from '../passkeys';
 import type { ApiKey, Delivery, Destination, Feedback, Project, ProjectCounts } from '../repository';
 import type { Category, ListFeedbackQuery } from '../schema';
-import { categories, statuses } from '../schema';
+import { categories, statusLabels, statuses } from '../schema';
 import type { OverviewStats } from '../repository';
-import { AppIcon, BackLink, PageHead } from './layout';
+import { AppIcon, BackLink, PageHead, StatusBadge } from './layout';
 
 type ProjectWithCounts = Project & { counts: ProjectCounts };
 
@@ -41,9 +41,32 @@ function versionLabel(feedback: Feedback): string {
   return `${feedback.context.app_version} (${feedback.context.build_number})`;
 }
 
-function deviceLabel(feedback: Feedback): string {
-  return `${feedback.context.device_family} · ${feedback.context.os_version}`;
-}
+
+const ImageMark: FC = () => (
+  <svg class="img" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-label="has image"><rect x="2" y="3" width="12" height="10" rx="2"/><circle cx="6" cy="7" r="1.2" fill="currentColor" stroke="none"/><path d="M3 12l3.5-3.5 2.5 2.5 2-2L14 12"/></svg>
+);
+
+/** One Linear-style issue line: status, key, title, then category/version/time on the right. */
+const IssueRow: FC<{ feedback: Feedback; href: string; app?: ProjectWithCounts }> = ({ feedback, href, app }) => (
+  <li class="issue-row">
+    <a class="issue" href={href}>
+      <StatusBadge status={feedback.status} iconOnly />
+      <span class="key">{feedback.key}</span>
+      <span class="title">
+        {app ? <AppIcon project={app} /> : null}
+        {app ? ' ' : ''}
+        {excerpt(feedback.message, 140)}
+        {feedback.name ? <span class="who"> · {feedback.name}</span> : null}
+      </span>
+      <span class="end">
+        {feedback.attachment ? <ImageMark /> : null}
+        <CategoryTag category={feedback.category} />
+        <span>{feedback.context.app_version}</span>
+        <span>{relativeTime(feedback.created_at)}</span>
+      </span>
+    </a>
+  </li>
+);
 
 // ---------------------------------------------------------------------------
 // Overview
@@ -55,10 +78,10 @@ export const OverviewPage: FC<{
   latest: Array<{ feedback: Feedback; project: ProjectWithCounts }>;
 }> = ({ projects, stats, latest }) => (
   <>
-    <PageHead title="Overview" meta={`${projects.length} ${projects.length === 1 ? 'app' : 'apps'} · ${stats.new} new ${stats.new === 1 ? 'message' : 'messages'}`} />
+    <PageHead title="Overview" meta={`${projects.length} ${projects.length === 1 ? 'app' : 'apps'} · ${stats.open} open · ${stats.todo} to do`} />
 
     <div class="stats">
-      <div class="stat"><div class="k">New</div><div class={`v ${stats.new > 0 ? 'accent' : ''}`}>{stats.new}</div></div>
+      <div class="stat"><div class="k">Open</div><div class={`v ${stats.open > 0 ? 'accent' : ''}`}>{stats.open}</div></div>
       <div class="stat"><div class="k">Open bugs</div><div class={`v ${stats.open_bugs > 0 ? 'warn' : ''}`}>{stats.open_bugs}</div></div>
       <div class="stat"><div class="k">Last 7 days</div><div class="v">{stats.last_7_days}</div></div>
       <div class="stat"><div class="k">Awaiting reply</div><div class="v">{stats.awaiting_reply}</div></div>
@@ -69,23 +92,7 @@ export const OverviewPage: FC<{
       {latest.length === 0 ? <div class="empty">{projects.length === 0 ? 'Add an app to start receiving feedback.' : 'No feedback yet. It will show up here the moment it arrives.'}</div> : null}
       <ul class="rows">
         {latest.map(({ feedback, project }) => (
-          <li>
-            <a class="r" href={`/p/${project.id}/f/${feedback.id}`}>
-              <AppIcon project={project} />
-              <span style="min-width: 0">
-                <div class="title">{excerpt(feedback.message, 110)}</div>
-                <div class="sub">
-                  {project.name} · <CategoryTag category={feedback.category} />
-                  {feedback.name ? ` · ${feedback.name}` : ''}
-                  {' · '}{versionLabel(feedback)}
-                </div>
-              </span>
-              <span class="end">
-                <span>{relativeTime(feedback.created_at)}</span>
-                <span class={`pill ${feedback.status}`}>{feedback.status}</span>
-              </span>
-            </a>
-          </li>
+          <IssueRow feedback={feedback} href={`/p/${project.id}/f/${feedback.id}`} app={project} />
         ))}
       </ul>
     </div>
@@ -94,14 +101,14 @@ export const OverviewPage: FC<{
     {projects.length === 0 ? <div class="panel"><div class="empty">No apps yet.</div></div> : null}
     <div class="apps">
       {projects.map((project) => (
-        <a class="app" href={`/p/${project.id}`} title={`${project.counts.new} new · ${project.counts.triaged} triaged · ${project.counts.closed} closed`}>
+        <a class="app" href={`/p/${project.id}`} title={`${project.counts.todo} to do · ${project.counts.in_progress} in progress · ${project.counts.done} done · ${project.counts.wont_do} won't do`}>
           <AppIcon project={project} size="lg" />
           <span style="min-width: 0">
-            <div class="title">{project.name}</div>
+            <div class="title">{project.name} <span class="key">{project.key}</span></div>
             <div class="sub">
-              {project.counts.new > 0 ? <b>{project.counts.new} new</b> : <span>0 new</span>}
-              {project.counts.triaged > 0 ? ` · ${project.counts.triaged} triaged` : ''}
-              {project.counts.new === 0 && project.counts.triaged === 0 ? ` · ${project.counts.closed} closed` : ''}
+              {project.counts.todo > 0 ? <b>{project.counts.todo} to do</b> : <span>0 to do</span>}
+              {project.counts.in_progress > 0 ? ` · ${project.counts.in_progress} in progress` : ''}
+              {project.counts.todo === 0 && project.counts.in_progress === 0 ? ` · ${project.counts.done} done` : ''}
             </div>
           </span>
         </a>
@@ -156,7 +163,7 @@ export const InboxPage: FC<{
   if (query.app_version) nextParams.set('app_version', query.app_version);
   if (query.q) nextParams.set('q', query.q);
   if (nextCursor) nextParams.set('cursor', nextCursor);
-  const filtered = Boolean(query.status || query.category || query.app_version || query.q);
+  const filtered = Boolean((query.status && query.status !== 'open') || query.category || query.app_version || query.q);
   return (
     <>
       <PageHead crumb={<BackLink href="/" label="Overview" />} title={project.name} meta={project.bundle_id ?? project.slug} icon={<AppIcon project={project} size="xl" />}>
@@ -165,9 +172,10 @@ export const InboxPage: FC<{
       <div class="panel">
         <form method="get" action={`/p/${project.id}`} class="filters" data-autosubmit>
           <select name="status" aria-label="Status">
-            <option value="">Any status</option>
+            <option value="open" selected={query.status === 'open'}>Open</option>
+            <option value="" selected={!query.status}>Any status</option>
             {statuses.map((status) => (
-              <option value={status} selected={query.status === status}>{status}</option>
+              <option value={status} selected={query.status === status}>{statusLabels[status]}</option>
             ))}
           </select>
           <select name="category" aria-label="Category">
@@ -182,33 +190,15 @@ export const InboxPage: FC<{
               <option value={version} selected={query.app_version === version}>{version}</option>
             ))}
           </select>
-          <input class="q" name="q" value={query.q ?? ''} maxlength={200} placeholder="Search message, name, email" aria-label="Search" />
+          <input class="q" name="q" value={query.q ?? ''} maxlength={200} placeholder={`Search message, name, email or ${project.key}-12`} aria-label="Search" />
           <a class={`reset ${filtered ? 'show' : ''}`} href={`/p/${project.id}`}>Clear</a>
         </form>
         {feedback.length === 0 ? (
-          <div class="empty">{filtered ? 'No feedback matches these filters.' : 'Feedback from the app will appear here as it arrives.'}</div>
+          <div class="empty">{filtered ? 'No feedback matches these filters.' : query.status === 'open' ? 'Nothing open. Feedback from the app will appear here as it arrives.' : 'Feedback from the app will appear here as it arrives.'}</div>
         ) : null}
         <ul class="rows">
           {feedback.map((item) => (
-            <li>
-              <a class="r" href={`/p/${project.id}/f/${item.id}`} style="grid-template-columns: minmax(0, 1fr) auto">
-                <span style="min-width: 0">
-                  <div class="title">{excerpt(item.message, 120)}</div>
-                  <div class="sub">
-                    <CategoryTag category={item.category} />
-                    {' · '}
-                    {item.name ? `${item.name} · ` : ''}
-                    {versionLabel(item)} · {deviceLabel(item)}
-                    {item.user.account_status === 'paid' ? ' · paid' : ''}
-                    {item.attachment ? ' · image' : ''}
-                  </div>
-                </span>
-                <span class="end">
-                  <span>{relativeTime(item.created_at)}</span>
-                  <span class={`pill ${item.status}`}>{item.status}</span>
-                </span>
-              </a>
-            </li>
+            <IssueRow feedback={item} href={`/p/${project.id}/f/${item.id}`} />
           ))}
         </ul>
         {nextCursor ? (
@@ -226,7 +216,7 @@ export const InboxPage: FC<{
 // ---------------------------------------------------------------------------
 
 export const FeedbackDetailPage: FC<{ project: Project; feedback: Feedback; deliveries: Delivery[] }> = ({ project, feedback, deliveries }) => {
-  const reference = feedback.id.slice(0, 8).toUpperCase();
+  const reference = feedback.key;
   const mailto = feedback.reply_email
     ? `mailto:${encodeURIComponent(feedback.reply_email)}?subject=${encodeURIComponent(`Re: your ${project.name} feedback ${reference}`)}`
     : null;
@@ -235,10 +225,17 @@ export const FeedbackDetailPage: FC<{ project: Project; feedback: Feedback; deli
     <>
       <PageHead
         crumb={<BackLink href={`/p/${project.id}`} label={`${project.name} inbox`} />}
-        title={`${feedback.category[0]!.toUpperCase()}${feedback.category.slice(1)} · ${reference}`}
-        meta={`${relativeTime(feedback.created_at)} · ${feedback.created_at.replace('T', ' ').slice(0, 16)} UTC`}
+        title={reference}
+        meta={`${feedback.category[0]!.toUpperCase()}${feedback.category.slice(1)} · ${relativeTime(feedback.created_at)} · ${feedback.created_at.replace('T', ' ').slice(0, 16)} UTC`}
       >
-        <span class={`pill ${feedback.status}`}>{feedback.status}</span>
+        <form method="post" action={`/p/${project.id}/f/${feedback.id}/status`} class="badge-select" data-autosubmit>
+          <StatusBadge status={feedback.status} iconOnly />
+          <select name="status" aria-label="Status">
+            {statuses.map((status) => (
+              <option value={status} selected={feedback.status === status}>{statusLabels[status]}</option>
+            ))}
+          </select>
+        </form>
       </PageHead>
 
       <div class="panel">
@@ -256,13 +253,8 @@ export const FeedbackDetailPage: FC<{ project: Project; feedback: Feedback; deli
           ) : null}
         </div>
         <div class="panel-head" style="border-top: 1px solid var(--line); border-bottom: 0">
-          <form method="post" action={`/p/${project.id}/f/${feedback.id}/status`} class="seg">
-            {statuses.map((status) => (
-              <button type="submit" name="status" value={status} class={feedback.status === status ? 'on' : ''} disabled={feedback.status === status}>
-                Mark {status}
-              </button>
-            ))}
-          </form>
+          <StatusBadge status={feedback.status} />
+          <span class="hint small">{feedback.user.account_status === 'paid' ? 'Paying customer' : feedback.user.account_status === 'free' ? 'Free user' : ''}</span>
           <div class="right">
             {mailto ? <a class="btn" href={mailto}>Reply by email</a> : <span class="hint">No reply email</span>}
             <form method="post" action={`/p/${project.id}/f/${feedback.id}/delete`}>

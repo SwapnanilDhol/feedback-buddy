@@ -17,7 +17,15 @@ export const categories = ['feedback', 'bug', 'idea'] as const;
 export const categorySchema = z.enum(categories);
 export type Category = z.infer<typeof categorySchema>;
 
-export const statuses = ['new', 'triaged', 'closed'] as const;
+export const statuses = ['todo', 'in_progress', 'done', 'wont_do'] as const;
+export const statusLabels: Record<(typeof statuses)[number], string> = {
+  todo: 'To Do',
+  in_progress: 'In Progress',
+  done: 'Done',
+  wont_do: "Won't Do",
+};
+/** Open = still needs attention. */
+export const openStatuses = ['todo', 'in_progress'] as const;
 export const statusSchema = z.enum(statuses);
 export type Status = z.infer<typeof statusSchema>;
 
@@ -129,8 +137,9 @@ export const patchFeedbackSchema = z.strictObject({
   internal_note: z.string().refine((value) => scalars(value) <= 4000).nullable().optional(),
 }).refine((value) => Object.keys(value).length > 0, { message: 'empty patch' });
 
+export const statusFilterSchema = z.enum([...statuses, 'open']);
 export const listFeedbackQuerySchema = z.object({
-  status: statusSchema.optional(),
+  status: statusFilterSchema.optional(),
   category: categorySchema.optional(),
   app_version: z.string().trim().max(40).optional(),
   q: z.string().trim().max(200).optional(),

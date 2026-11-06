@@ -64,12 +64,14 @@ function checkSubmission(submission, label) {
 }
 
 function checkFeedbackObject(feedback, label) {
-  const required = ["id", "project_id", "category", "status", "message", "name", "reply_email", "context", "user", "attachment", "internal_note", "created_at", "updated_at"];
+  const required = ["id", "key", "number", "project_id", "category", "status", "message", "name", "reply_email", "context", "user", "attachment", "internal_note", "created_at", "updated_at"];
   for (const key of required) if (!(key in feedback)) fail(`${label}: ${key} missing`);
   for (const key of Object.keys(feedback)) if (!required.includes(key)) fail(`${label}: unexpected ${key}`);
   if (!uuid.test(feedback.id)) fail(`${label}: id`);
   if (!categories.includes(feedback.category)) fail(`${label}: category`);
-  if (!["new", "triaged", "closed"].includes(feedback.status)) fail(`${label}: status`);
+  if (!["todo", "in_progress", "done", "wont_do"].includes(feedback.status)) fail(`${label}: status`);
+  if (typeof feedback.key !== "string" || !/^[A-Z0-9]{2,6}-\d+$/.test(feedback.key)) fail(`${label}: key`);
+  if (!Number.isInteger(feedback.number) || feedback.number < 1) fail(`${label}: number`);
   checkContext(feedback.context, label);
   checkUser(feedback.user, label, { requireAll: true });
   if (feedback.attachment !== null) {

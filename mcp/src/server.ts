@@ -3,12 +3,13 @@ import { z } from 'zod';
 
 import type { FeedbackBuddyClient } from './client.js';
 
-const status = z.enum(['new', 'triaged', 'closed']);
+const status = z.enum(['todo', 'in_progress', 'done', 'wont_do']);
+const statusFilter = z.enum(['todo', 'in_progress', 'done', 'wont_do', 'open']);
 const category = z.enum(['feedback', 'bug', 'idea']);
 
-interface Project { id: string; slug: string; name: string; bundle_id: string | null; icon_url: string | null; counts?: { new: number; triaged: number; closed: number } }
+interface Project { id: string; slug: string; key: string; name: string; bundle_id: string | null; icon_url: string | null; counts?: { todo: number; in_progress: number; done: number; wont_do: number } }
 interface Feedback {
-  id: string; project_id: string; category: string; status: string; message: string; name: string | null; reply_email: string | null;
+  id: string; key: string; number: number; project_id: string; category: string; status: string; message: string; name: string | null; reply_email: string | null;
   context: { app_version: string; build_number: string; os_version: string; locale: string; device_family: string; device_model: string | null };
   user: { id: string | null; account_status: string; plan: string | null; entitlements: string[]; attributes: Record<string, string> };
   attachment: { content_type: string; byte_count: number; url: string } | null;
@@ -41,11 +42,11 @@ export function createServer(client: FeedbackBuddyClient): McpServer {
 
   server.registerTool('list_projects', {
     title: 'List apps',
-    description: 'All apps (projects) with counts of new, triaged and closed feedback.',
+    description: 'All apps (projects) with their issue key prefix and counts of feedback by status (todo, in_progress, done, wont_do).',
     inputSchema: {},
   }, async () => {
     const { projects } = await client.json<{ projects: Project[] }>('GET', '/api/v1/projects');
-    return text(projects.map(({ id, slug, name, bundle_id, counts }) => ({ id, slug, name, bundle_id, counts })));
+    return text(projects.map(({ id, slug, key, name, bundle_id, counts }) => ({ id, slug, key, name, bundle_id, counts })));
   });
 
   server.registerTool('overview', {
@@ -61,17 +62,17 @@ export function createServer(client: FeedbackBuddyClient): McpServer {
     const latest = perProject.flat().sort((a, b) => b.created_at.localeCompare(a.created_at)).slice(0, limit);
     return text({
       apps: projects.map(({ slug, name, counts }) => ({ slug, name, counts })),
-      latest: latest.map(({ id, app, app_slug, category, status, message, name, reply_email, context, attachment, created_at }) =>
-        ({ id, app, app_slug, category, status, message, name, reply_email, app_version: context.app_version, has_image: Boolean(attachment), created_at })),
+      latest: latest.map(({ id, key, app, app_slug, category, status, message, name, reply_email, context, attachment, created_at }) =>
+        ({ id, key, app, app_slug, category, status, message, name, reply_email, app_version: context.app_version, has_image: Boolean(attachment), created_at })),
     });
   });
 
   server.registerTool('list_feedback', {
     title: 'List feedback for an app',
-    description: 'Feedback for one app, newest first. Filter by status, category, app version or a search term. Returns a cursor for older pages.',
+    description: 'Feedback for one app, newest first. Filter by status (todo, in_progress, done, wont_do, or open = todo+in_progress), category, app version or a search term. Returns a cursor for older pages.',
     inputSchema: {
       project: z.string().describe('App slug, name, bundle id or project id (e.g. "goaley")'),
-      status: status.optional(),
+      status: statusFilter.optional(),
       category: category.optional(),
       app_version: z.string().optional(),
       q: z.string().max(200).optional().describe('Search in message, name and email'),
@@ -86,8 +87,8 @@ export function createServer(client: FeedbackBuddyClient): McpServer {
     const result = await client.json<{ feedback: Feedback[]; next_cursor?: string | null }>('GET', `/api/v1/projects/${resolved.id}/feedback?${params}`);
     return text({
       app: resolved.name,
-      feedback: result.feedback.map(({ id, category, status, message, name, reply_email, context, user, attachment, internal_note, created_at }) =>
-        ({ id, category, status, message, name, reply_email, app_version: context.app_version, build: context.build_number, os: context.os_version, device: context.device_family, account: user.account_status, plan: user.plan, has_image: Boolean(attachment), internal_note, created_at })),
+      feedback: result.feedback.map(({ id, key, category, status, message, name, reply_email, context, user, attachment, internal_note, created_at }) =>
+        ({ id, key, category, status, message, name, reply_email, app_version: context.app_version, build: context.build_number, os: context.os_version, device: context.device_family, account: user.account_status, plan: user.plan, has_image: Boolean(attachment), internal_note, created_at })),
       next_cursor: result.next_cursor ?? null,
     });
   });
@@ -111,7 +112,7 @@ export function createServer(client: FeedbackBuddyClient): McpServer {
 
   server.registerTool('update_feedback', {
     title: 'Update status or note',
-    description: 'Set the triage status (new, triaged, closed) and/or an internal note on a feedback item.',
+    description: 'Set the workflow status (todo, in_progress, done, wont_do) and/or an internal note on a feedback item.',
     inputSchema: {
       feedback_id: z.string().uuid(),
       status: status.optional(),

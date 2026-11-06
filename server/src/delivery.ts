@@ -282,9 +282,11 @@ export function sampleFeedback(project: Project): Feedback {
   const now = new Date().toISOString();
   return {
     id: '00000000-0000-4000-8000-000000000000',
+    key: `${project.key}-0`,
+    number: 0,
     project_id: project.id,
     category: 'feedback',
-    status: 'new',
+    status: 'todo',
     message: 'This is a test delivery from FeedbackBuddy. Your destination is connected.',
     name: 'FeedbackBuddy',
     reply_email: null,

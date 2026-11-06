@@ -122,7 +122,7 @@ Client status mapping used by the SDK: 429 → `.rateLimited`; 400/413/415/422 �
 
 | Method & path | Body / query | Returns |
 |---|---|---|
-| `GET /api/v1/projects` | | `{ "projects": [Project] }` with `counts: {new, triaged, closed}` |
+| `GET /api/v1/projects` | | `{ "projects": [Project] }` with `key` (issue prefix such as `GOA`) and `counts: {todo, in_progress, done, wont_do}` |
 
 `Project` carries `icon_url` (nullable): the App Store artwork looked up by bundle ID via the iTunes Search API, cached and rechecked weekly.
 | `POST /api/v1/projects` | `{ "name", "slug"?, "bundle_id"?, "retention_days"? }` | `201 { "project": Project, "public_key": "fb_pub_…" }` — the plaintext key is returned **once** |
@@ -134,9 +134,9 @@ Client status mapping used by the SDK: 429 → `.rateLimited`; 400/413/415/422 �
 | `PATCH /api/v1/projects/:id/destinations/:destId` | `enabled`, `url`, `categories` | `{ "destination" }` |
 | `DELETE /api/v1/projects/:id/destinations/:destId` | | `{ "ok": true }` |
 | `POST /api/v1/projects/:id/destinations/:destId/test` | | sends a sample event; `{ "ok", "error"? }` |
-| `GET /api/v1/projects/:id/feedback` | `status`, `category`, `app_version`, `q`, `limit` (≤ 100, default 50), `cursor` | `{ "feedback": [Feedback], "next_cursor"? }` newest first |
+| `GET /api/v1/projects/:id/feedback` | `status` (`todo`, `in_progress`, `done`, `wont_do`, or `open` = todo + in_progress), `category`, `app_version`, `q` (text, or an exact key like `GOA-12`), `limit` (≤ 100, default 50), `cursor` | `{ "feedback": [Feedback], "next_cursor"? }` newest first |
 | `GET /api/v1/feedback/:feedbackId` | | `{ "feedback": Feedback, "deliveries": [Delivery] }` |
-| `PATCH /api/v1/feedback/:feedbackId` | `{ "status"?: "new"\|"triaged"\|"closed", "internal_note"?: string ≤ 4000 }` | `{ "feedback" }` |
+| `PATCH /api/v1/feedback/:feedbackId` | `{ "status"?: "todo"\|"in_progress"\|"done"\|"wont_do", "internal_note"?: string ≤ 4000 }` | `{ "feedback" }` |
 | `GET /api/v1/feedback/:feedbackId/attachment` | | the image bytes, or 404 |
 | `POST /api/v1/feedback/:feedbackId/redeliver` | | requeues failed deliveries; `202` |
 | `DELETE /api/v1/feedback/:feedbackId` | | removes the record and its attachment; `{ "ok": true }` |
@@ -145,7 +145,7 @@ Client status mapping used by the SDK: 429 → `.rateLimited`; 400/413/415/422 �
 
 ```json
 {
-  "id": "…", "project_id": "…", "category": "bug", "status": "new",
+  "id": "…", "key": "GOA-12", "number": 12, "project_id": "…", "category": "bug", "status": "todo",
   "message": "…", "name": null, "reply_email": null,
   "context": { "app_version": "5.0", "build_number": "400", "os_version": "26.0", "locale": "en-IN", "device_family": "iPhone", "device_model": null },
   "user": { "id": null, "account_status": "unknown", "plan": null, "entitlements": [], "attributes": {} },
@@ -155,7 +155,7 @@ Client status mapping used by the SDK: 429 → `.rateLimited`; 400/413/415/422 �
 }
 ```
 
-`attachment` is `null` when none was sent or after retention expiry.
+`attachment` is `null` when none was sent or after retention expiry. `key` is the per-app issue key (project prefix + per-project sequence number); new feedback starts in `todo`. Workflow: `todo` → `in_progress` → `done`, or `wont_do`.
 
 ## Webhook event `feedback.created`
 

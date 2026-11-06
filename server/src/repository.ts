@@ -13,6 +13,7 @@ export interface ProjectRow {
   retention_days: number;
   icon_url: string | null;
   icon_checked_at: string | null;
+  key: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -25,14 +26,17 @@ export interface Project {
   accent: string | null;
   retention_days: number;
   icon_url: string | null;
+  /** Short uppercase issue key prefix, e.g. GOA → GOA-12. */
+  key: string;
   created_at: string;
   updated_at: string;
 }
 
 export interface ProjectCounts {
-  new: number;
-  triaged: number;
-  closed: number;
+  todo: number;
+  in_progress: number;
+  done: number;
+  wont_do: number;
 }
 
 export function toProject(row: ProjectRow): Project {
@@ -44,6 +48,7 @@ export function toProject(row: ProjectRow): Project {
     accent: row.accent,
     retention_days: row.retention_days,
     icon_url: row.icon_url ?? null,
+    key: row.key ?? projectKeyBase(row.slug),
     created_at: row.created_at,
     updated_at: row.updated_at,
   };
@@ -69,18 +74,34 @@ export async function uniqueSlug(db: D1Database, base: string): Promise<string> 
   throw new Error('slug_unavailable');
 }
 
+/** GOA from "goaley", PAD from "padel-score": letters and digits only, 2–4 characters, uppercase. */
+export function projectKeyBase(slugOrName: string): string {
+  const compact = slugOrName.toUpperCase().replace(/[^A-Z0-9]/g, '');
+  return (compact.slice(0, 3) || 'APP').padEnd(2, 'X');
+}
+
+export async function uniqueProjectKey(db: D1Database, base: string): Promise<string> {
+  for (let attempt = 0; attempt < 50; attempt += 1) {
+    const candidate = attempt === 0 ? base : `${base}${attempt + 1}`;
+    const taken = await db.prepare('SELECT 1 FROM projects WHERE key = ?1').bind(candidate).first();
+    if (!taken) return candidate;
+  }
+  return `${base}${randomUrlSafe(3).toUpperCase().replace(/[^A-Z0-9]/g, 'X')}`;
+}
+
 export async function createProject(
   db: D1Database,
   input: { name: string; slug: string; bundle_id?: string | null; retention_days: number; accent?: string | null },
 ): Promise<Project> {
   const now = nowIso();
   const id = `prj_${randomUrlSafe(16)}`;
+  const key = await uniqueProjectKey(db, projectKeyBase(input.slug));
   await db
     .prepare(
-      `INSERT INTO projects (id, slug, name, bundle_id, accent, retention_days, created_at, updated_at)
-       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?7)`,
+      `INSERT INTO projects (id, slug, name, bundle_id, accent, retention_days, key, created_at, updated_at)
+       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?8)`,
     )
-    .bind(id, input.slug, input.name, input.bundle_id ?? null, input.accent ?? null, input.retention_days, now)
+    .bind(id, input.slug, input.name, input.bundle_id ?? null, input.accent ?? null, input.retention_days, key, now)
     .run();
   const row = await readProject(db, id);
   if (!row) throw new Error('project_missing_after_insert');
@@ -96,15 +117,16 @@ export async function listProjects(db: D1Database): Promise<Array<Project & { co
   const { results } = await db
     .prepare(
       `SELECT p.*,
-         (SELECT COUNT(*) FROM feedback f WHERE f.project_id = p.id AND f.status = 'new') AS count_new,
-         (SELECT COUNT(*) FROM feedback f WHERE f.project_id = p.id AND f.status = 'triaged') AS count_triaged,
-         (SELECT COUNT(*) FROM feedback f WHERE f.project_id = p.id AND f.status = 'closed') AS count_closed
+         (SELECT COUNT(*) FROM feedback f WHERE f.project_id = p.id AND f.status = 'todo') AS count_todo,
+         (SELECT COUNT(*) FROM feedback f WHERE f.project_id = p.id AND f.status = 'in_progress') AS count_in_progress,
+         (SELECT COUNT(*) FROM feedback f WHERE f.project_id = p.id AND f.status = 'done') AS count_done,
+         (SELECT COUNT(*) FROM feedback f WHERE f.project_id = p.id AND f.status = 'wont_do') AS count_wont_do
        FROM projects p ORDER BY p.created_at ASC`,
     )
-    .all<ProjectRow & { count_new: number; count_triaged: number; count_closed: number }>();
+    .all<ProjectRow & { count_todo: number; count_in_progress: number; count_done: number; count_wont_do: number }>();
   return results.map((row) => ({
     ...toProject(row),
-    counts: { new: row.count_new, triaged: row.count_triaged, closed: row.count_closed },
+    counts: { todo: row.count_todo, in_progress: row.count_in_progress, done: row.count_done, wont_do: row.count_wont_do },
   }));
 }
 
@@ -169,7 +191,9 @@ export async function markIconLookupFailed(db: D1Database, id: string, now = Dat
 }
 
 export interface OverviewStats {
-  new: number;
+  /** To Do + In Progress. */
+  open: number;
+  todo: number;
   open_bugs: number;
   last_7_days: number;
   awaiting_reply: number;
@@ -180,16 +204,18 @@ export async function overviewStats(db: D1Database, now = Date.now()): Promise<O
   const row = await db
     .prepare(
       `SELECT
-         SUM(CASE WHEN status = 'new' THEN 1 ELSE 0 END) AS n_new,
-         SUM(CASE WHEN category = 'bug' AND status != 'closed' THEN 1 ELSE 0 END) AS n_bugs,
+         SUM(CASE WHEN status IN ('todo', 'in_progress') THEN 1 ELSE 0 END) AS n_open,
+         SUM(CASE WHEN status = 'todo' THEN 1 ELSE 0 END) AS n_todo,
+         SUM(CASE WHEN category = 'bug' AND status IN ('todo', 'in_progress') THEN 1 ELSE 0 END) AS n_bugs,
          SUM(CASE WHEN created_at >= ?1 THEN 1 ELSE 0 END) AS n_week,
-         SUM(CASE WHEN status = 'new' AND reply_email IS NOT NULL THEN 1 ELSE 0 END) AS n_reply
+         SUM(CASE WHEN status IN ('todo', 'in_progress') AND reply_email IS NOT NULL THEN 1 ELSE 0 END) AS n_reply
        FROM feedback`,
     )
     .bind(weekAgo)
-    .first<{ n_new: number | null; n_bugs: number | null; n_week: number | null; n_reply: number | null }>();
+    .first<{ n_open: number | null; n_todo: number | null; n_bugs: number | null; n_week: number | null; n_reply: number | null }>();
   return {
-    new: row?.n_new ?? 0,
+    open: row?.n_open ?? 0,
+    todo: row?.n_todo ?? 0,
     open_bugs: row?.n_bugs ?? 0,
     last_7_days: row?.n_week ?? 0,
     awaiting_reply: row?.n_reply ?? 0,
@@ -199,7 +225,7 @@ export async function overviewStats(db: D1Database, now = Date.now()): Promise<O
 /** Newest feedback across every project, for the overview stream. */
 export async function listLatestFeedback(db: D1Database, limit = 12): Promise<FeedbackRow[]> {
   const { results } = await db
-    .prepare(`SELECT * FROM feedback ORDER BY created_at DESC, id DESC LIMIT ${Math.min(Math.max(limit, 1), 50)}`)
+    .prepare(`${feedbackSelect} ORDER BY f.created_at DESC, f.id DESC LIMIT ${Math.min(Math.max(limit, 1), 50)}`)
     .all<FeedbackRow>();
   return results;
 }
@@ -284,6 +310,9 @@ export async function resolveProjectByKeyHash(db: D1Database, hash: string): Pro
 export interface FeedbackRow {
   id: string;
   project_id: string;
+  number: number;
+  /** Present when the row was selected with the project join. */
+  project_key?: string | null;
   idempotency_key: string;
   category: Category;
   message: string;
@@ -320,6 +349,9 @@ export interface FeedbackAttachment {
 
 export interface Feedback {
   id: string;
+  /** Issue key, e.g. GOA-12. */
+  key: string;
+  number: number;
   project_id: string;
   category: Category;
   status: Status;
@@ -353,6 +385,8 @@ export function toFeedback(row: FeedbackRow, attachmentUrl: AttachmentUrlResolve
   const hasAttachment = row.attachment_key && row.attachment_content_type && row.attachment_byte_count !== null;
   return {
     id: row.id,
+    key: `${row.project_key ?? 'FB'}-${row.number}`,
+    number: row.number,
     project_id: row.project_id,
     category: row.category,
     status: row.status,
@@ -431,10 +465,11 @@ export async function insertFeedback(
          installation_hash, user_agent, app_version, build_number, os_version, locale,
          device_family, device_model, user_id, account_status, plan, entitlements_json,
          attributes_json, attachment_key, attachment_content_type, attachment_byte_count,
-         attachment_token, created_at, updated_at
+         attachment_token, created_at, updated_at, number
        ) VALUES (
          ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18,
-         ?19, ?20, ?21, ?22, ?23, ?24, ?25, ?25
+         ?19, ?20, ?21, ?22, ?23, ?24, ?25, ?25,
+         (SELECT COALESCE(MAX(number), 0) + 1 FROM feedback WHERE project_id = ?2)
        )`,
     )
     .bind(
@@ -466,7 +501,7 @@ export async function insertFeedback(
     )
     .run();
   const row = await db
-    .prepare('SELECT * FROM feedback WHERE project_id = ?1 AND idempotency_key = ?2')
+    .prepare(`${feedbackSelect} WHERE f.project_id = ?1 AND f.idempotency_key = ?2`)
     .bind(input.project_id, input.idempotency_key)
     .first<FeedbackRow>();
   if (!row) throw new Error('feedback_missing_after_insert');
@@ -482,13 +517,15 @@ export async function deleteFeedback(db: D1Database, id: string): Promise<Feedba
   return row;
 }
 
+const feedbackSelect = 'SELECT f.*, p.key AS project_key FROM feedback f JOIN projects p ON p.id = f.project_id';
+
 export async function readFeedback(db: D1Database, id: string): Promise<FeedbackRow | null> {
-  return db.prepare('SELECT * FROM feedback WHERE id = ?1').bind(id).first<FeedbackRow>();
+  return db.prepare(`${feedbackSelect} WHERE f.id = ?1`).bind(id).first<FeedbackRow>();
 }
 
 export async function readFeedbackByAttachmentToken(db: D1Database, token: string): Promise<FeedbackRow | null> {
   return db
-    .prepare('SELECT * FROM feedback WHERE attachment_token = ?1 AND attachment_key IS NOT NULL')
+    .prepare(`${feedbackSelect} WHERE f.attachment_token = ?1 AND f.attachment_key IS NOT NULL`)
     .bind(token)
     .first<FeedbackRow>();
 }
@@ -527,28 +564,29 @@ export async function listFeedback(
   projectId: string,
   query: ListFeedbackQuery,
 ): Promise<{ rows: FeedbackRow[]; next_cursor: string | null }> {
-  const clauses = ['project_id = ?1'];
+  const clauses = ['f.project_id = ?1'];
   const values: unknown[] = [projectId];
   const bind = (value: unknown): string => {
     values.push(value);
     return `?${values.length}`;
   };
-  if (query.status) clauses.push(`status = ${bind(query.status)}`);
-  if (query.category) clauses.push(`category = ${bind(query.category)}`);
-  if (query.app_version) clauses.push(`app_version = ${bind(query.app_version)}`);
+  if (query.status === 'open') clauses.push(`f.status IN ('todo', 'in_progress')`);
+  else if (query.status) clauses.push(`f.status = ${bind(query.status)}`);
+  if (query.category) clauses.push(`f.category = ${bind(query.category)}`);
+  if (query.app_version) clauses.push(`f.app_version = ${bind(query.app_version)}`);
   if (query.q) {
     const like = `%${query.q.replace(/[%_\\]/g, (char) => `\\${char}`)}%`;
     clauses.push(
-      `(message LIKE ${bind(like)} ESCAPE '\\' OR name LIKE ${bind(like)} ESCAPE '\\' OR reply_email LIKE ${bind(like)} ESCAPE '\\')`,
+      `(f.message LIKE ${bind(like)} ESCAPE '\\' OR f.name LIKE ${bind(like)} ESCAPE '\\' OR f.reply_email LIKE ${bind(like)} ESCAPE '\\' OR (p.key || '-' || f.number) = ${bind(query.q.toUpperCase())})`,
     );
   }
   const cursor = decodeCursor(query.cursor);
   if (cursor) {
-    clauses.push(`(created_at < ${bind(cursor.created_at)} OR (created_at = ${bind(cursor.created_at)} AND id < ${bind(cursor.id)}))`);
+    clauses.push(`(f.created_at < ${bind(cursor.created_at)} OR (f.created_at = ${bind(cursor.created_at)} AND f.id < ${bind(cursor.id)}))`);
   }
   const limit = query.limit + 1;
   const { results } = await db
-    .prepare(`SELECT * FROM feedback WHERE ${clauses.join(' AND ')} ORDER BY created_at DESC, id DESC LIMIT ${limit}`)
+    .prepare(`${feedbackSelect} WHERE ${clauses.join(' AND ')} ORDER BY f.created_at DESC, f.id DESC LIMIT ${limit}`)
     .bind(...values)
     .all<FeedbackRow>();
   const hasMore = results.length > query.limit;

@@ -20,7 +20,7 @@ function shapeOf(value: unknown): unknown {
   return value === null ? 'null' : typeof value;
 }
 
-const sampleProject = { id: 'prj_x', slug: 'x', name: 'X App', bundle_id: null, accent: null, retention_days: 30, icon_url: null, created_at: '', updated_at: '' };
+const sampleProject = { id: 'prj_x', slug: 'x', key: 'XAP', name: 'X App', bundle_id: null, accent: null, retention_days: 30, icon_url: null, created_at: '', updated_at: '' };
 
 let restore: (() => void) | null = null;
 afterEach(() => {
@@ -165,9 +165,9 @@ describe('webhook delivery', () => {
 describe('email destinations', () => {
   it('renders a readable email with the image inline and a reply-to', async () => {
     const { buildEmail } = await import('../src/delivery');
-    const project = { id: 'prj_x', slug: 'goaley', name: 'Goaley', bundle_id: null, accent: null, retention_days: 30, icon_url: null, created_at: '2026-01-01T00:00:00.000Z', updated_at: '2026-01-01T00:00:00.000Z' };
+    const project = { id: 'prj_x', slug: 'goaley', key: 'GOA', name: 'Goaley', bundle_id: null, accent: null, retention_days: 30, icon_url: null, created_at: '2026-01-01T00:00:00.000Z', updated_at: '2026-01-01T00:00:00.000Z' };
     const feedback = {
-      id: '33333333-3333-4333-8333-333333333333', project_id: 'prj_x', category: 'bug' as const, status: 'new' as const,
+      id: '33333333-3333-4333-8333-333333333333', key: 'GOA-7', number: 7, project_id: 'prj_x', category: 'bug' as const, status: 'todo' as const,
       message: 'The <sheet> clips & hides the button', name: 'Marta', reply_email: 'marta@example.com',
       context: { app_version: '3.2.0', build_number: '410', os_version: '18.4', locale: 'de-DE', device_family: 'iPhone', device_model: 'iPhone16,1' },
       user: { id: null, account_status: 'paid' as const, plan: 'pro', entitlements: ['pro'], attributes: {} },

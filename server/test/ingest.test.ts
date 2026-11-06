@@ -46,7 +46,7 @@ describe('POST /v1/feedback', () => {
     );
     expect(stored.status).toBe(200);
     expect(stored.body.feedback.message).toBe(validSubmission.message);
-    expect(stored.body.feedback.status).toBe('new');
+    expect(stored.body.feedback.status).toBe('todo');
     expect(stored.body.feedback.context.device_model).toBeNull();
     expect(stored.body.feedback.user.account_status).toBe('unknown');
 

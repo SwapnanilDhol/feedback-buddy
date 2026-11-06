@@ -262,7 +262,7 @@ dashboard.get('/', async (context) => {
   const byId = new Map(projects.map((project) => [project.id, project]));
   const latest = latestRows
     .map((row) => ({ feedback: toFeedback(row, adminAttachmentUrl), project: byId.get(row.project_id) }))
-    .filter((entry): entry is { feedback: ReturnType<typeof toFeedback>; project: Project & { counts: { new: number; triaged: number; closed: number } } } => Boolean(entry.project));
+    .filter((entry): entry is { feedback: ReturnType<typeof toFeedback>; project: NonNullable<typeof entry.project> } => Boolean(entry.project));
   return context.html(
     <Layout title="Overview" projects={projects} activeNav="overview" flash={takeFlash(context)}>
       <OverviewPage projects={projects} stats={stats} latest={latest} />
@@ -303,6 +303,8 @@ dashboard.get('/p/:id', async (context) => {
   const project = await loadProject(context.env, context.req.param('id'));
   const raw = context.req.query();
   const cleaned = Object.fromEntries(Object.entries(raw).filter(([, value]) => value !== ''));
+  // The inbox shows open items unless a status was chosen explicitly ("" = any).
+  if (!('status' in raw)) cleaned.status = 'open';
   const parsedQuery = listFeedbackQuerySchema.safeParse(cleaned);
   const query = parsedQuery.success ? parsedQuery.data : listFeedbackQuerySchema.parse({});
   const [projects, result, appVersions] = await Promise.all([

@@ -124,3 +124,19 @@ Known gaps:
   bursts (shared Cloudflare egress): the first production pass of ten failed
   entirely. Now at most three lookups per maintenance pass; a failed lookup is
   retried after 15 minutes, while "no result" is rechecked weekly.
+
+## Workflow statuses and issue keys — 2026-11-07
+
+- Statuses are now `todo` / `in_progress` / `done` / `wont_do` (Jira/Linear
+  style), validated in code; migration `0005` rebuilds `feedback` without the
+  old CHECK and maps new→todo, triaged→in_progress, closed→done.
+- Each project has a short issue key (`GOA`) and each feedback a per-project
+  sequence number, shown as `GOA-12` everywhere, searchable by exact key, and
+  exposed on the API (`key`, `number`) and MCP.
+- Dashboard rows are single-line Linear-style issues (status icon, key, title,
+  category, version, time); the detail header has a status dropdown that
+  saves on change; the inbox defaults to open items (`status=open`).
+- Also in this stretch: in-place client navigation with a page cache, a
+  doctype on every page (Quirks Mode was adding form margins), an email
+  destination via Cloudflare Email Sending, feedback deletion, and the
+  `mcp/` server.

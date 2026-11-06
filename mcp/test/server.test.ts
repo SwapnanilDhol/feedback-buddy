@@ -5,9 +5,9 @@ import { describe, expect, it } from 'vitest';
 import { FeedbackBuddyClient } from '../src/client.js';
 import { createServer } from '../src/server.js';
 
-const project = { id: 'prj_1', slug: 'goaley', name: 'Goaley', bundle_id: 'com.swapnanildhol.Goaley', icon_url: null, counts: { new: 1, triaged: 0, closed: 0 } };
+const project = { id: 'prj_1', slug: 'goaley', key: 'GOA', name: 'Goaley', bundle_id: 'com.swapnanildhol.Goaley', icon_url: null, counts: { todo: 1, in_progress: 0, done: 0, wont_do: 0 } };
 const feedback = {
-  id: '33333333-3333-4333-8333-333333333333', project_id: 'prj_1', category: 'bug', status: 'new', message: 'It clips', name: null, reply_email: null,
+  id: '33333333-3333-4333-8333-333333333333', key: 'GOA-1', number: 1, project_id: 'prj_1', category: 'bug', status: 'todo', message: 'It clips', name: null, reply_email: null,
   context: { app_version: '1.0', build_number: '1', os_version: '26.0', locale: 'en', device_family: 'iPhone', device_model: null },
   user: { id: null, account_status: 'unknown', plan: null, entitlements: [], attributes: {} },
   attachment: { content_type: 'image/jpeg', byte_count: 4, url: '/api/v1/feedback/33333333-3333-4333-8333-333333333333/attachment' },
@@ -50,11 +50,11 @@ describe('feedback-buddy MCP server', () => {
 
   it('resolves projects by slug and filters feedback', async () => {
     const { client, api } = await connect();
-    const result = await client.callTool({ name: 'list_feedback', arguments: { project: 'Goaley', status: 'new' } });
+    const result = await client.callTool({ name: 'list_feedback', arguments: { project: 'Goaley', status: 'todo' } });
     const payload = JSON.parse((result.content as Array<{ text: string }>)[0]!.text) as { app: string; feedback: Array<{ has_image: boolean }> };
     expect(payload.app).toBe('Goaley');
     expect(payload.feedback[0]?.has_image).toBe(true);
-    expect(api.calls).toContain('GET /api/v1/projects/prj_1/feedback?limit=25&status=new');
+    expect(api.calls).toContain('GET /api/v1/projects/prj_1/feedback?limit=25&status=todo');
     await expect(client.callTool({ name: 'list_feedback', arguments: { project: 'nope' } })).resolves.toMatchObject({ isError: true });
   });
 
@@ -62,7 +62,7 @@ describe('feedback-buddy MCP server', () => {
     const { client, api } = await connect();
     const image = await client.callTool({ name: 'get_attachment', arguments: { feedback_id: feedback.id } });
     expect((image.content as Array<{ type: string; mimeType?: string }>)[0]).toMatchObject({ type: 'image', mimeType: 'image/jpeg' });
-    await client.callTool({ name: 'update_feedback', arguments: { feedback_id: feedback.id, status: 'triaged' } });
+    await client.callTool({ name: 'update_feedback', arguments: { feedback_id: feedback.id, status: 'in_progress' } });
     expect(api.calls).toContain(`PATCH /api/v1/feedback/${feedback.id}`);
   });
 });

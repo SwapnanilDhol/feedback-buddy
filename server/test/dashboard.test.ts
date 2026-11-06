@@ -45,23 +45,24 @@ describe('dashboard', () => {
     expect(inboxHtml).toContain('&lt;script&gt;alert(1)&lt;/script&gt;');
     expect(inboxHtml).toContain(`/p/${project.id}/f/${body.feedback_id}`);
 
-    const filtered = await call(`/p/${project.id}?status=closed&category=bug`, { headers: { Cookie: cookie } });
+    const filtered = await call(`/p/${project.id}?status=done&category=bug`, { headers: { Cookie: cookie } });
     expect(await filtered.text()).toContain('No feedback matches');
 
     const detail = await call(`/p/${project.id}/f/${body.feedback_id}`, { headers: { Cookie: cookie } });
     expect(detail.status).toBe(200);
     const detailHtml = await detail.text();
     expect(detailHtml).toContain('&lt;b&gt;Bold&lt;/b&gt;');
-    expect(detailHtml).toContain('Mark triaged');
+    expect(detailHtml).toContain('In Progress');
+    expect(detailHtml).toMatch(/[A-Z0-9]{2,6}-\d+/);
 
     const status = await call(`/p/${project.id}/f/${body.feedback_id}/status`, {
       method: 'POST',
       headers: { Cookie: cookie, 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: 'status=triaged',
+      body: 'status=in_progress',
     });
     expect(status.status).toBe(303);
     const after = await call(`/p/${project.id}/f/${body.feedback_id}`, { headers: { Cookie: cookie } });
-    expect(await after.text()).toContain('pill triaged');
+    expect(await after.text()).toContain('pill in_progress');
 
     const otherProject = await createProject();
     expect((await call(`/p/${otherProject.id}/f/${body.feedback_id}`, { headers: { Cookie: cookie } })).status).toBe(404);
