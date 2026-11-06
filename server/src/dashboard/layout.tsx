@@ -1,3 +1,4 @@
+import { raw } from 'hono/html';
 import type { FC, PropsWithChildren } from 'hono/jsx';
 
 import type { Project, ProjectCounts } from '../repository';
@@ -228,30 +229,114 @@ dt { color: var(--muted); } dd { margin: 0; overflow-wrap: anywhere; }
 `;
 
 const script = `
-document.addEventListener('click', function (event) {
-  var target = event.target;
-  if (!(target instanceof HTMLElement)) return;
-  var copy = target.closest('[data-copy]');
-  if (copy) {
-    var source = document.getElementById(copy.getAttribute('data-copy'));
-    if (source && navigator.clipboard) {
-      navigator.clipboard.writeText(source.textContent || '').then(function () {
-        var original = copy.textContent; copy.textContent = 'Copied'; setTimeout(function () { copy.textContent = original; }, 1200);
-      });
+(function () {
+  // Click delegation works across swaps; per-element bindings are (re)applied by enhance().
+  document.addEventListener('click', function (event) {
+    var target = event.target;
+    if (!(target instanceof HTMLElement)) return;
+    var copy = target.closest('[data-copy]');
+    if (copy) {
+      var source = document.getElementById(copy.getAttribute('data-copy'));
+      if (source && navigator.clipboard) {
+        navigator.clipboard.writeText(source.textContent || '').then(function () {
+          var original = copy.textContent; copy.textContent = 'Copied'; setTimeout(function () { copy.textContent = original; }, 1200);
+        });
+      }
     }
+    var confirmable = target.closest('[data-confirm]');
+    if (confirmable && !window.confirm(confirmable.getAttribute('data-confirm'))) { event.preventDefault(); }
+  });
+
+  window.fbEnhance = function (root) {
+    root.querySelectorAll('form[data-autosubmit] select').forEach(function (select) {
+      if (select.dataset.bound) return; select.dataset.bound = '1';
+      select.addEventListener('change', function () { select.form.requestSubmit ? select.form.requestSubmit() : select.form.submit(); });
+    });
+    var toast = root.querySelector('.toast');
+    if (toast && !toast.dataset.bound) { toast.dataset.bound = '1'; setTimeout(function () { toast.classList.add('hide'); }, 3600); setTimeout(function () { toast.remove(); }, 4000); }
+    if (window.fbEnhancePasskeys) window.fbEnhancePasskeys();
+  };
+  window.fbEnhance(document);
+
+  // Client-side navigation: same-origin links fetch the next page and swap it in
+  // place, so there is no full reload. Visited pages are kept in memory and
+  // Back/Forward restore them instantly, scroll position included.
+  var cache = new Map();
+  var current = { url: location.href };
+  function cacheable(doc) { return doc.querySelector('.main') && doc.querySelector('.side'); }
+  function snapshot() {
+    if (!cacheable(document)) return;
+    cache.set(current.url, { title: document.title, main: document.querySelector('.main').innerHTML, side: document.querySelector('.side').innerHTML, scroll: window.scrollY, at: Date.now() });
   }
-  var confirmable = target.closest('[data-confirm]');
-  if (confirmable && !window.confirm(confirmable.getAttribute('data-confirm'))) { event.preventDefault(); }
-});
-document.querySelectorAll('form[data-autosubmit] select').forEach(function (select) {
-  select.addEventListener('change', function () { select.form.requestSubmit ? select.form.requestSubmit() : select.form.submit(); });
-});
-var toast = document.querySelector('.toast');
-if (toast) { setTimeout(function () { toast.classList.add('hide'); }, 3600); setTimeout(function () { toast.remove(); }, 4000); }
+  function render(page, scroll) {
+    var apply = function () {
+      document.title = page.title;
+      document.querySelector('.main').innerHTML = page.main;
+      document.querySelector('.side').innerHTML = page.side;
+      window.scrollTo(0, scroll);
+      window.fbEnhance(document);
+    };
+    if (document.startViewTransition && !matchMedia('(prefers-reduced-motion: reduce)').matches) document.startViewTransition(apply); else apply();
+  }
+  var inflight = new Map();
+  function fetchPage(url) {
+    if (inflight.has(url)) return inflight.get(url);
+    var promise = fetch(url, { credentials: 'same-origin', headers: { 'X-Requested-With': 'fb-nav' } }).then(function (response) {
+      if (!response.ok || response.redirected) throw new Error('navigate');
+      return response.text();
+    }).then(function (html) {
+      var doc = new DOMParser().parseFromString(html, 'text/html');
+      if (!cacheable(doc)) throw new Error('navigate');
+      return { title: doc.title, main: doc.querySelector('.main').innerHTML, side: doc.querySelector('.side').innerHTML, scroll: 0, at: Date.now() };
+    }).finally(function () { inflight.delete(url); });
+    inflight.set(url, promise);
+    return promise;
+  }
+  function go(url, push) {
+    snapshot();
+    var cached = cache.get(url);
+    var fromCache = !push && cached;
+    var showPage = function (page, scroll) { current = { url: url }; render(page, scroll); };
+    if (fromCache) { showPage(cached, cached.scroll); return; }
+    fetchPage(url).then(function (page) { cache.set(url, page); if (push) history.pushState({ fb: true }, '', url); showPage(page, 0); })
+      .catch(function () { location.href = url; });
+  }
+  document.addEventListener('click', function (event) {
+    if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    var link = event.target instanceof Element ? event.target.closest('a[href]') : null;
+    if (!link || link.target || link.hasAttribute('download') || link.dataset.native !== undefined) return;
+    var url = new URL(link.href, location.href);
+    if (url.origin !== location.origin || url.pathname === '/login' || url.pathname.startsWith('/api/') || url.pathname.startsWith('/v1/')) return;
+    if (url.href === location.href) { event.preventDefault(); return; }
+    event.preventDefault();
+    go(url.href, true);
+  });
+  document.addEventListener('mouseover', function (event) {
+    var link = event.target instanceof Element ? event.target.closest('a[href]') : null;
+    if (!link || link.target || link.dataset.native !== undefined) return;
+    var url = new URL(link.href, location.href);
+    if (url.origin !== location.origin || url.pathname === '/login' || url.pathname.startsWith('/api/') || url.pathname.startsWith('/v1/') || cache.has(url.href) || url.href === location.href) return;
+    fetchPage(url.href).then(function (page) { cache.set(url.href, page); }).catch(function () {});
+  });
+  // GET forms (filters, search) navigate in place too, without empty parameters in the URL.
+  document.addEventListener('submit', function (event) {
+    var form = event.target;
+    if (!(form instanceof HTMLFormElement) || (form.method || 'get').toLowerCase() !== 'get' || event.defaultPrevented) return;
+    var url = new URL(form.action || location.href, location.href);
+    if (url.origin !== location.origin) return;
+    var params = new URLSearchParams();
+    new FormData(form).forEach(function (value, key) { if (typeof value === 'string' && value !== '') params.append(key, value); });
+    url.search = params.toString();
+    event.preventDefault();
+    go(url.href, true);
+  });
+  window.addEventListener('popstate', function () { go(location.href, false); });
+  if (!history.state || !history.state.fb) history.replaceState({ fb: true }, '', location.href);
+})();
 `;
 
 export const passkeyScript = `
-(function () {
+window.fbEnhancePasskeys = function () {
   function toBuffer(value) {
     var s = value.replace(/-/g, '+').replace(/_/g, '/');
     var pad = s.length % 4 ? '='.repeat(4 - (s.length % 4)) : '';
@@ -292,7 +377,8 @@ export const passkeyScript = `
   function status(id, text, isError) { var el = document.getElementById(id); if (!el) return; el.textContent = text; el.className = 'status' + (isError ? ' error' : ''); }
   var supported = !!(window.PublicKeyCredential && navigator.credentials);
   var loginButton = document.getElementById('passkey-login');
-  if (loginButton) {
+  if (loginButton && !loginButton.dataset.bound) {
+    loginButton.dataset.bound = '1';
     if (!supported) { loginButton.disabled = true; status('passkey-status', 'This browser does not support passkeys. Use the password instead.', true); }
     loginButton.addEventListener('click', async function () {
       loginButton.disabled = true; status('passkey-status', 'Waiting for your passkey…');
@@ -307,7 +393,8 @@ export const passkeyScript = `
     });
   }
   var addForm = document.getElementById('passkey-add');
-  if (addForm) {
+  if (addForm && !addForm.dataset.bound) {
+    addForm.dataset.bound = '1';
     var addButton = addForm.querySelector('button');
     if (!supported) { addButton.disabled = true; status('passkey-add-status', 'This browser does not support passkeys.', true); }
     addForm.addEventListener('submit', async function (event) {
@@ -324,7 +411,8 @@ export const passkeyScript = `
       } catch (error) { status('passkey-add-status', explain(error), true); addButton.disabled = false; }
     });
   }
-})();
+};
+window.fbEnhancePasskeys();
 `;
 
 /** Stable hue per slug so each app keeps its colour everywhere. */
@@ -375,7 +463,13 @@ const Head: FC<{ title: string }> = ({ title }) => (
   </head>
 );
 
+// Without a doctype browsers render in Quirks Mode, which adds default
+// margins to forms and changes box sizing in places; always emit one.
+const doctype = raw('<!DOCTYPE html>');
+
 export const Layout: FC<PropsWithChildren<LayoutProps>> = ({ title, projects, activeProjectId, activeNav, flash, children }) => (
+  <>
+  {doctype}
   <html lang="en">
     <Head title={title} />
     <body>
@@ -418,10 +512,11 @@ export const Layout: FC<PropsWithChildren<LayoutProps>> = ({ title, projects, ac
         </main>
       </div>
       {flash && flash.kind !== 'key' ? <div class={`toast ${flash.kind === 'error' ? 'error' : ''}`} role="status">{flash.text}</div> : null}
-      <script dangerouslySetInnerHTML={{ __html: script }} />
       <script dangerouslySetInnerHTML={{ __html: passkeyScript }} />
+      <script dangerouslySetInnerHTML={{ __html: script }} />
     </body>
   </html>
+  </>
 );
 
 const KeyBox: FC<{ value: string }> = ({ value }) => (
@@ -451,6 +546,8 @@ export const PageHead: FC<PropsWithChildren<{ crumb?: unknown; title: string; me
 );
 
 export const LoginPage: FC<{ error?: string | null; hasPasskeys: boolean; showPassword: boolean }> = ({ error, hasPasskeys, showPassword }) => (
+  <>
+  {doctype}
   <html lang="en">
     <Head title="Sign in" />
     <body class="login-shell">
@@ -483,4 +580,5 @@ export const LoginPage: FC<{ error?: string | null; hasPasskeys: boolean; showPa
       {hasPasskeys ? <script dangerouslySetInnerHTML={{ __html: passkeyScript }} /> : null}
     </body>
   </html>
+  </>
 );
