@@ -127,7 +127,7 @@ function many(value: string | string[] | undefined): string[] {
 // ----- Session -----
 
 async function loginPage(context: AppContext, error: string | null, status: 200 | 401 | 429 = 200) {
-  const hasPasskeys = (await countPasskeys(context.env.DB)) > 0;
+  const hasPasskeys = (await countPasskeys(context.env.DB, relyingParty(context.req.raw).rpID)) > 0;
   const showPassword = !hasPasskeys || context.req.query('password') === '1' || error !== null;
   return context.html(<LoginPage error={error} hasPasskeys={hasPasskeys} showPassword={showPassword} />, status);
 }
@@ -176,7 +176,7 @@ function credentialBody(value: unknown): Record<string, unknown> & { id: string 
 dashboard.post('/auth/passkey/options', async (context) => {
   requireSameOrigin(context);
   if (!recordLoginAttempt(clientAddress(context))) throw new ApiError(429, 'rate_limited');
-  if ((await countPasskeys(context.env.DB)) === 0) throw new ApiError(404, 'no_passkeys');
+  if ((await countPasskeys(context.env.DB, relyingParty(context.req.raw).rpID)) === 0) throw new ApiError(404, 'no_passkeys');
   const options = await authenticationOptions(context.env.DB, relyingParty(context.req.raw));
   await issueChallenge(context, options.challenge, 'authentication');
   return context.json(options);
@@ -208,7 +208,7 @@ dashboard.use('*', requireSession);
 // ----- Security (passkeys) -----
 
 dashboard.get('/security', async (context) => {
-  const [projects, passkeys] = await Promise.all([listProjects(context.env.DB), listPasskeys(context.env.DB)]);
+  const [projects, passkeys] = await Promise.all([listProjects(context.env.DB), listPasskeys(context.env.DB, relyingParty(context.req.raw).rpID)]);
   return context.html(
     <Layout title="Security" projects={projects} activeNav="security" flash={takeFlash(context)}>
       <SecurityPage passkeys={passkeys.map(toPasskey)} />

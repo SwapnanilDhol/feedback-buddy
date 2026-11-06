@@ -18,6 +18,7 @@ import { base64UrlDecode, base64UrlEncode, base64UrlToUtf8, hmacSha256Hex, timin
 
 export interface PasskeyRow {
   id: string;
+  rp_id: string | null;
   name: string;
   public_key: string;
   counter: number;
@@ -48,13 +49,18 @@ export function toPasskey(row: PasskeyRow): Passkey {
   };
 }
 
-export async function listPasskeys(db: D1Database): Promise<PasskeyRow[]> {
-  const result = await db.prepare('SELECT * FROM passkeys ORDER BY created_at ASC').all<PasskeyRow>();
+/** Passkeys for one relying party (host); omit to list every host's. */
+export async function listPasskeys(db: D1Database, rpId?: string): Promise<PasskeyRow[]> {
+  const result = rpId
+    ? await db.prepare('SELECT * FROM passkeys WHERE rp_id = ?1 ORDER BY created_at ASC').bind(rpId).all<PasskeyRow>()
+    : await db.prepare('SELECT * FROM passkeys ORDER BY created_at ASC').all<PasskeyRow>();
   return result.results;
 }
 
-export async function countPasskeys(db: D1Database): Promise<number> {
-  const row = await db.prepare('SELECT COUNT(*) AS n FROM passkeys').first<{ n: number }>();
+export async function countPasskeys(db: D1Database, rpId?: string): Promise<number> {
+  const row = rpId
+    ? await db.prepare('SELECT COUNT(*) AS n FROM passkeys WHERE rp_id = ?1').bind(rpId).first<{ n: number }>()
+    : await db.prepare('SELECT COUNT(*) AS n FROM passkeys').first<{ n: number }>();
   return row?.n ?? 0;
 }
 
@@ -70,10 +76,10 @@ export async function deletePasskey(db: D1Database, id: string): Promise<boolean
 async function insertPasskey(db: D1Database, row: PasskeyRow): Promise<void> {
   await db
     .prepare(
-      `INSERT INTO passkeys (id, name, public_key, counter, transports_json, device_type, backed_up, created_at, last_used_at)
-       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, NULL)`,
+      `INSERT INTO passkeys (id, rp_id, name, public_key, counter, transports_json, device_type, backed_up, created_at, last_used_at)
+       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, NULL)`,
     )
-    .bind(row.id, row.name, row.public_key, row.counter, row.transports_json, row.device_type, row.backed_up, row.created_at)
+    .bind(row.id, row.rp_id, row.name, row.public_key, row.counter, row.transports_json, row.device_type, row.backed_up, row.created_at)
     .run();
 }
 
@@ -174,7 +180,7 @@ export async function verifyChallenge(secret: string, value: string | undefined,
 export const verifiers = { verifyRegistrationResponse, verifyAuthenticationResponse };
 
 export async function registrationOptions(db: D1Database, party: RelyingParty): Promise<PublicKeyCredentialCreationOptionsJSON> {
-  const existing = await listPasskeys(db);
+  const existing = await listPasskeys(db, party.rpID);
   return generateRegistrationOptions({
     rpName: relyingPartyName,
     rpID: party.rpID,
@@ -205,6 +211,7 @@ export async function completeRegistration(
   const { credential, credentialDeviceType, credentialBackedUp } = verification.registrationInfo;
   const row: PasskeyRow = {
     id: credential.id,
+    rp_id: party.rpID,
     name,
     public_key: bytesToBase64Url(credential.publicKey),
     counter: credential.counter,
@@ -219,7 +226,7 @@ export async function completeRegistration(
 }
 
 export async function authenticationOptions(db: D1Database, party: RelyingParty): Promise<PublicKeyCredentialRequestOptionsJSON> {
-  const existing = await listPasskeys(db);
+  const existing = await listPasskeys(db, party.rpID);
   return generateAuthenticationOptions({
     rpID: party.rpID,
     userVerification: 'preferred',
@@ -234,7 +241,7 @@ export async function completeAuthentication(
   response: AuthenticationResponseJSON,
 ): Promise<Passkey | null> {
   const row = await readPasskey(db, response.id);
-  if (!row) return null;
+  if (!row || (row.rp_id && row.rp_id !== party.rpID)) return null;
   const publicKey = base64UrlToBytes(row.public_key);
   if (!publicKey) return null;
   const verification = await verifiers.verifyAuthenticationResponse({

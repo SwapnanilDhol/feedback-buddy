@@ -140,3 +140,22 @@ Known gaps:
   doctype on every page (Quirks Mode was adding form margins), an email
   destination via Cloudflare Email Sending, feedback deletion, and the
   `mcp/` server.
+
+## Next.js dashboard on Vercel — 2026-11-07
+
+- `dashboard/`: Next.js 16 App Router, Tailwind 4, shadcn/ui, `motion`,
+  `@simplewebauthn/browser`. Server components fetch the Worker admin API
+  with the admin token from Vercel env (`FEEDBACK_API_URL`,
+  `FEEDBACK_ADMIN_TOKEN`, `DASHBOARD_SESSION_SECRET`); mutations are server
+  actions; attachments are proxied through a route handler. Own HMAC session
+  cookie; password and passkey ceremonies go through the Worker's
+  `/api/v1/auth/*` endpoints with the dashboard host as relying party.
+- Passkeys now carry `rp_id` (migration `0006`); each host only lists,
+  offers and accepts its own. The Worker's `ALLOWED_RP_IDS` var lists the
+  Vercel hostnames.
+- Vercel project `feedback-buddy` (team swapnanildhols-projects), deployed
+  with `vercel deploy --prod` from `dashboard/`. Framework had to be set to
+  Next.js explicitly via the API (the CLI-created project had none, which
+  served platform 404s), and Vercel Authentication was switched off because
+  the app has its own login. Production: https://feedback-buddy.vercel.app.
+- The Worker's SSR dashboard stays as a fallback at the workers.dev host.

@@ -296,8 +296,10 @@ admin.post('/auth/password', async (context) => {
 });
 
 admin.get('/auth/passkeys', async (context) => {
-  const rows = await listPasskeys(context.env.DB);
-  return context.json({ passkeys: rows.map(toPasskey) });
+  // Optional ?rp_id= narrows to one dashboard host; omitted = every host.
+  const rpId = context.req.query('rp_id')?.trim().toLowerCase();
+  const rows = await listPasskeys(context.env.DB, rpId || undefined);
+  return context.json({ passkeys: rows.map((row) => ({ ...toPasskey(row), rp_id: row.rp_id })) });
 });
 
 admin.post('/auth/passkeys/registration-options', async (context) => {
@@ -326,7 +328,7 @@ admin.delete('/auth/passkeys/:id', async (context) => {
 admin.post('/auth/passkeys/authentication-options', async (context) => {
   const body = await readLimitedRequestJson(context.req.raw, 4 * 1024);
   const party = allowedRelyingParty(context, body);
-  if ((await listPasskeys(context.env.DB)).length === 0) throw new ApiError(404, 'no_passkeys');
+  if ((await listPasskeys(context.env.DB, party.rpID)).length === 0) throw new ApiError(404, 'no_passkeys');
   return context.json(await authenticationOptions(context.env.DB, party));
 });
 

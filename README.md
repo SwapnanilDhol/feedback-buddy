@@ -21,7 +21,9 @@ deploy per app.
 |---|---|
 | `Sources/FeedbackBuddy` | iOS 17+ UI: `FeedbackBuddy` facade, SwiftUI form, sheet modifier, UIKit presentation, Keychain installation ID, image compression |
 | `Sources/FeedbackBuddyCore` | Platform-neutral contract models, validation, HTTP transport (no UIKit) |
-| `server/` | Cloudflare Worker: ingest API, dashboard, admin API, D1 + R2, delivery retries and retention |
+| `server/` | Cloudflare Worker: ingest API, admin API, D1 + R2, delivery retries and retention, plus a built-in fallback dashboard |
+| `dashboard/` | The dashboard: Next.js 16, Tailwind 4, shadcn/ui, motion. Deployed on Vercel at https://feedback-buddy.vercel.app, talks to the Worker admin API server-side |
+| `mcp/` | MCP server exposing projects, feedback, attachments and triage to agents |
 | `contracts/` | JSON schemas and golden fixtures — the source of truth for client and server |
 | `docs/` | [Plan](docs/PLAN.md) · [HTTP contract v1](docs/contract-v1.md) · [Integration](docs/integration.md) · [Migrating from SwapFoundationKitFeedback](docs/migration-from-sfk.md) · ADRs |
 
