@@ -55,12 +55,12 @@ pre code { background: none; padding: 0; }
 .head h1 { font-size: 20px; font-weight: 600; letter-spacing: -0.3px; line-height: 28px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .head .meta { font-size: 13px; color: var(--muted); height: 20px; line-height: 20px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .head .actions { display: flex; gap: 8px; align-items: center; padding-bottom: 2px; }
-.head .titlerow { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.head .titlerow { display: flex; align-items: center; gap: 12px; min-width: 0; min-height: 48px; }
 
 /* Panels */
 .panel { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); margin-bottom: 16px; min-width: 0; }
 .panel > .pad { padding: 16px 20px; }
-.panel-head { display: flex; align-items: center; gap: 12px; min-height: 48px; padding: 0 20px; border-bottom: 1px solid var(--line); }
+.panel-head { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; min-height: 48px; padding: 8px 20px; border-bottom: 1px solid var(--line); }
 .panel-head h2 { font-size: 14px; font-weight: 600; }
 .panel-head .right { margin-left: auto; display: flex; gap: 8px; align-items: center; }
 .panel .hint { font-size: 13px; color: var(--muted); }
@@ -185,21 +185,46 @@ dt { color: var(--muted); } dd { margin: 0; overflow-wrap: anywhere; }
 
 @media (max-width: 820px) {
   .shell { grid-template-columns: 1fr; }
-  .side { position: static; height: auto; border-right: 0; border-bottom: 1px solid var(--line); padding: 12px 16px; display: grid; grid-template-columns: 1fr auto; row-gap: 8px; }
-  .brand { padding: 4px 0; }
-  .nav { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 4px; }
+  /* Sidebar becomes a compact header: brand + sign out on one line, app chips below. */
+  .side { position: static; height: auto; border-right: 0; border-bottom: 1px solid var(--line); padding: 10px 16px 12px; display: flex; flex-direction: row; flex-wrap: wrap; align-items: center; gap: 8px 10px; }
+  .brand { flex: 1; padding: 0; }
+  .side .foot { order: 2; margin: 0; padding: 0; border: 0; }
+  .nav { order: 3; flex-basis: 100%; display: flex; flex-wrap: wrap; gap: 6px; }
   .nav-label { display: none; }
-  .nav a { height: 28px; padding: 0 10px; grid-template-columns: 8px auto auto; gap: 8px; font-size: 13px; border: 1px solid var(--line); }
-  .nav .n { min-width: 0; } .nav .n:empty { display: none; }
-  .nav a[href="/security"] { grid-template-columns: auto; } .nav a[href="/security"] > span:first-child { display: none; }
-  .side .foot { margin: 0; padding: 0; justify-self: end; grid-row: 1; grid-column: 2; }
-  .main { padding: 20px 16px 48px; }
-  .filters { grid-template-columns: 1fr 1fr 1fr; }
-  .filters .q { grid-column: 1 / 3; } .filters .reset { justify-self: end; }
+  .nav a { display: inline-flex; align-items: center; gap: 7px; height: 30px; padding: 0 10px 0 7px; font-size: 13px; border: 1px solid var(--line); border-radius: 15px; }
+  .nav a .icon { width: 18px; height: 18px; }
+  .nav .n { min-width: 0; margin-left: 2px; } .nav .n:empty { display: none; }
+  .nav a.new-app .plus { display: none; } .nav a.new-app { padding-left: 10px; }
+  .nav a[href="/security"] > span:first-child { display: none; } .nav a[href="/security"] { padding-left: 10px; }
+  .main { padding: 18px 16px 48px; }
+  .head { grid-template-columns: 1fr; gap: 10px; min-height: 0; margin-bottom: 16px; }
+  .head .actions { padding: 0; }
+  .head .actions:empty { display: none; }
+  .stats { grid-template-columns: 1fr 1fr; gap: 10px; }
+  .stat { padding: 12px 14px; } .stat .v { font-size: 22px; }
+  .filters { grid-template-columns: 1fr 1fr; gap: 8px; padding: 12px 16px; }
+  .filters .q { grid-column: 1 / -1; }
+  .filters .reset { justify-self: end; }
+  .panel > .pad, .rows .r, .facts > div { padding-left: 16px; padding-right: 16px; }
+  .panel-head { padding: 8px 16px; }
+  .rows .r { grid-template-columns: minmax(0, 1fr) !important; row-gap: 6px; }
+  .stream .r { grid-template-columns: 20px minmax(0, 1fr) !important; }
+  .r .end { grid-column: 1 / -1; justify-content: flex-start; gap: 10px; flex-wrap: wrap; }
+  .stream .r .end { grid-column: 2; }
+  .r .title, .r .sub { white-space: normal; }
+  .seg { width: 100%; } .seg button { flex: 1; justify-content: center; padding: 0 6px; }
+  .panel-head:has(.seg) .right { margin-left: 0; width: 100%; justify-content: flex-end; }
+  .form-row > button { justify-self: start; }
+  .form-row { grid-template-columns: 1fr !important; }
+  .form-actions { flex-wrap: wrap; }
   .facts { grid-template-columns: 1fr; } .facts > div + div { border-left: 0; border-top: 1px solid var(--line); }
-  .stats { grid-template-columns: 1fr 1fr; }
-  .nav a.new-app .plus { display: none; } .nav a.new-app { grid-template-columns: auto; }
+  dl { grid-template-columns: 96px minmax(0, 1fr); }
+  .apps { grid-template-columns: 1fr 1fr; gap: 10px; } .app { padding: 10px 12px; gap: 10px; }
+  /* 16px inputs stop iOS Safari from zooming the page on focus. */
+  input, select, textarea { font-size: 16px; }
+  .toast { bottom: 16px; }
 }
+@media (max-width: 420px) { .apps { grid-template-columns: 1fr; } .stats { gap: 8px; } }
 `;
 
 const script = `
