@@ -3,19 +3,31 @@
 import PackageDescription
 
 let package = Package(
-    name: "FeedbackLoop",
+    name: "FeedbackBuddy",
+    defaultLocalization: "en",
     platforms: [
         .iOS(.v17),
         .macOS(.v14),
     ],
     products: [
-        .library(name: "FeedbackCore", targets: ["FeedbackCore"]),
+        .library(name: "FeedbackBuddy", targets: ["FeedbackBuddy"]),
+        .library(name: "FeedbackBuddyCore", targets: ["FeedbackBuddyCore"]),
     ],
     targets: [
-        .target(name: "FeedbackCore"),
-        .testTarget(
-            name: "FeedbackCoreTests",
-            dependencies: ["FeedbackCore"]
+        .target(name: "FeedbackBuddyCore"),
+        .target(
+            name: "FeedbackBuddy",
+            dependencies: ["FeedbackBuddyCore"],
+            resources: [.process("Resources")]
         ),
-    ]
+        .testTarget(
+            name: "FeedbackBuddyCoreTests",
+            dependencies: ["FeedbackBuddyCore"]
+        ),
+        .testTarget(
+            name: "FeedbackBuddyTests",
+            dependencies: ["FeedbackBuddy", "FeedbackBuddyCore"]
+        ),
+    ],
+    swiftLanguageModes: [.v6]
 )

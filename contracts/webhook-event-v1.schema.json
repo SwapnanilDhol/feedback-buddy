@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://feedback-loop.dev/contracts/webhook-event-v1.schema.json",
-  "title": "Feedback created webhook event v1",
+  "$id": "https://feedbackbuddy.dev/contracts/webhook-event-v1.schema.json",
+  "title": "FeedbackBuddy webhook event v1",
   "type": "object",
   "additionalProperties": false,
   "required": ["schema_version", "id", "type", "occurred_at", "project", "data"],
@@ -13,34 +13,13 @@
     "project": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["id", "name"],
+      "required": ["id", "slug", "name"],
       "properties": {
         "id": { "type": "string" },
+        "slug": { "type": "string" },
         "name": { "type": "string" }
       }
     },
-    "data": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["feedback_id", "category", "message", "reply_requested", "context"],
-      "properties": {
-        "feedback_id": { "type": "string", "format": "uuid" },
-        "category": { "enum": ["feedback", "bug", "idea"] },
-        "message": { "type": "string" },
-        "reply_requested": { "type": "boolean" },
-        "context": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": ["app_version", "build_number", "os_version", "locale", "device_family"],
-          "properties": {
-            "app_version": { "type": "string" },
-            "build_number": { "type": "string" },
-            "os_version": { "type": "string" },
-            "locale": { "type": "string" },
-            "device_family": { "type": "string" }
-          }
-        }
-      }
-    }
+    "data": { "$ref": "feedback-object-v1.schema.json" }
   }
 }

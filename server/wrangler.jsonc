@@ -1,0 +1,43 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "feedback-buddy",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-08-10",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": true,
+  "vars": {
+    "ENVIRONMENT": "production",
+    "PUBLIC_BASE_URL": "https://feedback-buddy.swapnanildhol.workers.dev",
+    "EMAIL_FROM": "feedback-buddy@swapnanildhol.com"
+  },
+  // Email destinations use Cloudflare Email Sending. The sender must be on a
+  // domain with Email Routing enabled; recipients must be verified addresses.
+  "send_email": [
+    {
+      "name": "EMAIL",
+      "allowed_destination_addresses": ["swapnanildhol@gmail.com", "support@swapnanildhol.com"],
+      "allowed_sender_addresses": ["feedback-buddy@swapnanildhol.com"]
+    }
+  ],
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "feedback-buddy",
+      "database_id": "a6cb8f15-3d10-4412-9c70-2842626a87b9",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "ATTACHMENTS",
+      "bucket_name": "feedback-buddy-attachments"
+    }
+  ],
+  // No cron trigger: the Workers Free plan allows 5 per account and they were
+  // all in use. Maintenance runs from requests instead (src/index.ts); add
+  // "triggers": { "crons": ["*/5 * * * *"] } back if a slot frees up.
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1
+  }
+}

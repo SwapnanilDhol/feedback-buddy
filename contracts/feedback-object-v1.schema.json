@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://feedbackbuddy.dev/contracts/feedback-object-v1.schema.json",
+  "title": "FeedbackBuddy feedback object v1 (admin API and webhook data)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "project_id", "category", "status", "message", "name", "reply_email", "context", "user", "attachment", "internal_note", "created_at", "updated_at"],
+  "properties": {
+    "id": { "type": "string", "format": "uuid" },
+    "project_id": { "type": "string" },
+    "category": { "enum": ["feedback", "bug", "idea"] },
+    "status": { "enum": ["new", "triaged", "closed"] },
+    "message": { "type": "string" },
+    "name": { "type": ["string", "null"] },
+    "reply_email": { "type": ["string", "null"] },
+    "context": { "$ref": "feedback-submission-v1.schema.json#/$defs/context" },
+    "user": { "$ref": "feedback-submission-v1.schema.json#/$defs/user" },
+    "attachment": {
+      "anyOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["content_type", "byte_count", "url"],
+          "properties": {
+            "content_type": { "enum": ["image/jpeg", "image/png"] },
+            "byte_count": { "type": "integer", "minimum": 4, "maximum": 1500000 },
+            "url": { "type": "string" }
+          }
+        }
+      ]
+    },
+    "internal_note": { "type": ["string", "null"] },
+    "created_at": { "type": "string", "format": "date-time" },
+    "updated_at": { "type": "string", "format": "date-time" }
+  }
+}

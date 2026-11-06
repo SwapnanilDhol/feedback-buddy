@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "feedback-buddy": {
+      "command": "node",
+      "args": ["mcp/dist/index.js"],
+      "env": {
+        "FEEDBACK_BASE_URL": "https://feedback-buddy.swapnanildhol.workers.dev",
+        "FEEDBACK_ADMIN_TOKEN": "${FEEDBACK_ADMIN_TOKEN}"
+      }
+    }
+  }
+}

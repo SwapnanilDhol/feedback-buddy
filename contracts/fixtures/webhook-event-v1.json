@@ -3,18 +3,37 @@
   "id": "44444444-4444-4444-8444-444444444444",
   "type": "feedback.created",
   "occurred_at": "2026-08-10T12:00:00.000Z",
-  "project": { "id": "my-app", "name": "My App" },
+  "project": { "id": "prj_01jcexample", "slug": "my-app", "name": "My App" },
   "data": {
-    "feedback_id": "33333333-3333-4333-8333-333333333333",
+    "id": "33333333-3333-4333-8333-333333333333",
+    "project_id": "prj_01jcexample",
     "category": "bug",
+    "status": "new",
     "message": "The wind card clips when gusts are shown.",
-    "reply_requested": false,
+    "name": null,
+    "reply_email": null,
     "context": {
       "app_version": "5.0",
       "build_number": "400",
       "os_version": "26.0",
       "locale": "en-IN",
-      "device_family": "iPhone"
-    }
+      "device_family": "iPhone",
+      "device_model": null
+    },
+    "user": {
+      "id": null,
+      "account_status": "unknown",
+      "plan": null,
+      "entitlements": [],
+      "attributes": {}
+    },
+    "attachment": {
+      "content_type": "image/jpeg",
+      "byte_count": 48213,
+      "url": "https://feedback-buddy.example.workers.dev/v1/attachments/3f9c0d1e5a7b4c2d8e6f1a0b9c8d7e6f3f9c0d1e5a7b4c2d8e6f1a0b9c8d7e6f"
+    },
+    "internal_note": null,
+    "created_at": "2026-08-10T12:00:00.000Z",
+    "updated_at": "2026-08-10T12:00:00.000Z"
   }
 }

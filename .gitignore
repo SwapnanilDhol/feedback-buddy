@@ -17,3 +17,8 @@ exports/
 coverage/
 node_modules/
 dist/
+
+# Cloudflare local state and operator secrets
+.wrangler/
+.secrets.local
+server/worker-configuration.d.ts

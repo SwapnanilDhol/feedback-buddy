@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "category": "idea",
+  "message": "Please add a dark mode option for the history screen.",
+  "name": "Swapnanil",
+  "reply_email": "user@example.com",
+  "context": {
+    "app_version": "5.0",
+    "build_number": "400",
+    "os_version": "26.0",
+    "locale": "en-IN",
+    "device_family": "iPhone",
+    "device_model": "iPhone17,1"
+  },
+  "user": {
+    "id": "$RCAnonymousID:1f2e3d4c",
+    "account_status": "paid",
+    "plan": "pro_annual",
+    "entitlements": ["pro"],
+    "attributes": { "theme": "dark", "onboarding": "complete" }
+  }
+}

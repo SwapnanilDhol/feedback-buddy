@@ -1,28 +1,78 @@
-# Feedback Loop
+# FeedbackBuddy
 
-A self-hosted feedback SDK and backend foundation for native apps. Feedback Loop is designed to give an app a structured feedback form, a versioned HTTP contract, durable storage, and asynchronous delivery to developer-owned destinations.
+In-app feedback for iOS apps in one line, with a hosted inbox you own.
 
-## What's here
+```swift
+import FeedbackBuddy
 
-- `FeedbackCore`: a Swift 6 package with platform-neutral models, validation, injected authorization/context/installation seams, and an HTTP transport.
-- `contracts/`: versioned JSON schemas and golden fixtures for client and server compatibility.
-- `docs/`: public architecture and engineering decision records.
-- `.github/workflows/ci.yml`: package and contract validation in CI.
+FeedbackBuddy.configure(apiKey: "fb_pub_…")       // once, at launch
+FeedbackBuddy.present(from: viewController)        // UIKit
+.feedbackBuddySheet(isPresented: $showFeedback)    // SwiftUI
+```
 
-The current release is an early foundation containing the SDK core and contracts. The reusable SwiftUI form, reference Worker, installer, and deployment template are planned next.
+Users get a polished form (feedback / bug / idea, message, optional name and
+email, one compressed screenshot). You get a dashboard inbox, Slack and
+webhook destinations, an admin API for scripts and agents, and nothing to
+deploy per app.
+
+## What's in this repository
+
+| Path | What |
+|---|---|
+| `Sources/FeedbackBuddy` | iOS 17+ UI: `FeedbackBuddy` facade, SwiftUI form, sheet modifier, UIKit presentation, Keychain installation ID, image compression |
+| `Sources/FeedbackBuddyCore` | Platform-neutral contract models, validation, HTTP transport (no UIKit) |
+| `server/` | Cloudflare Worker: ingest API, dashboard, admin API, D1 + R2, delivery retries and retention |
+| `contracts/` | JSON schemas and golden fixtures — the source of truth for client and server |
+| `docs/` | [Plan](docs/PLAN.md) · [HTTP contract v1](docs/contract-v1.md) · [Integration](docs/integration.md) · [Migrating from SwapFoundationKitFeedback](docs/migration-from-sfk.md) · ADRs |
+
+## Add it to an app
+
+1. Dashboard → **New project** → copy the public key.
+2. Xcode → Add Package → `https://github.com/SwapnanilDhol/feedback-buddy` → product **FeedbackBuddy**.
+3. Call `FeedbackBuddy.configure(apiKey:)` at launch and present the form from Settings.
+
+Full options (user context from RevenueCat, appearance, analytics events,
+custom UI) are in [docs/integration.md](docs/integration.md).
+
+## Run the backend
+
+```bash
+cd server
+npm install
+npm run check          # typecheck + tests against local D1/R2
+npm run dev            # http://localhost:8787 — dashboard at /, login with ADMIN_PASSWORD from .dev.vars
+```
+
+Deploying to your own Cloudflare account is described in
+[server/README.md](server/README.md): one Worker, one D1 database, one R2
+bucket, three secrets.
+
+## Triage from the terminal (or from an agent)
+
+```bash
+curl -s -H "Authorization: Bearer $FEEDBACK_ADMIN_TOKEN" \
+  "https://<worker>/api/v1/projects/<id>/feedback?status=new"
+```
+
+## Validate
+
+```bash
+swift test                                  # core, macOS
+xcodebuild test -scheme FeedbackBuddy-Package -destination 'platform=iOS Simulator,name=iPhone 16 Pro'
+node contracts/validate-fixtures.mjs
+cd server && npm run check
+```
 
 ## Design principles
 
-- The SDK speaks a documented HTTP contract and does not depend on a particular hosting provider.
-- Feedback is validated before submission and the transport supports stable idempotency keys.
-- Installation identity and request authorization are injected so host apps control persistence and optional hardening.
-- The package does not import analytics, logging, or third-party destination SDKs.
+- The SDK speaks only the documented HTTP contract; the Cloudflare Worker is
+  the reference backend, not a dependency.
+- Public keys can only create feedback; everything else needs the admin token
+  or a dashboard session.
+- The package imports no analytics, logging, or third-party SDKs.
+- Installation identity is pseudonymous and hashed before storage; attachments
+  expire.
 
-## Validation
+## License
 
-```sh
-swift test
-node contracts/validate-fixtures.mjs
-```
-
-The public HTTP contract is the source of truth. The transport works with any compatible backend; a Cloudflare reference backend is planned but is not required by the Swift package.
+MIT (see [LICENSE](LICENSE)).

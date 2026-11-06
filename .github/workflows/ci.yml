@@ -5,11 +5,43 @@ on:
   pull_request:
 
 jobs:
-  swift-and-contracts:
+  contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Validate contract fixtures
+        run: node contracts/validate-fixtures.mjs
+
+  server:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: server
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+      - run: npm ci
+      - run: npm run check
+
+  swift:
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
-      - name: Test Swift package
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_16.4.app || sudo xcode-select -s "$(ls -d /Applications/Xcode_16*.app | tail -1)"
+      - name: Core tests (macOS)
         run: swift test
-      - name: Validate contract fixtures
-        run: node contracts/validate-fixtures.mjs
+      - name: iOS build and tests
+        run: |
+          xcodebuild test \
+            -scheme FeedbackBuddy-Package \
+            -destination 'platform=iOS Simulator,name=iPhone 16' \
+            -skipPackagePluginValidation \
+            CODE_SIGNING_ALLOWED=NO | tail -50
