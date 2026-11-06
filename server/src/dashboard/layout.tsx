@@ -37,8 +37,8 @@ pre code { background: none; padding: 0; }
 
 /* Shell */
 .shell { display: grid; grid-template-columns: var(--side) minmax(0, 1fr); min-height: 100vh; }
-.side { position: sticky; top: 0; height: 100vh; overflow-y: auto; scrollbar-gutter: stable; background: var(--panel); border-right: 1px solid var(--line); padding: 20px 12px 16px; display: flex; flex-direction: column; }
-.brand { display: block; font-weight: 600; font-size: 14px; padding: 4px 8px 18px; color: var(--ink); }
+.side { position: sticky; top: 0; height: 100vh; overflow-y: auto; scrollbar-gutter: stable; background: var(--panel); border-right: 1px solid var(--line); padding: 24px 12px 16px; display: flex; flex-direction: column; }
+.brand { display: block; font-weight: 600; font-size: 14px; line-height: 20px; padding: 0 8px 20px; color: var(--ink); }
 .nav-label { display: block; font-size: 11px; font-weight: 500; letter-spacing: 0.4px; text-transform: uppercase; color: var(--muted); padding: 10px 8px 4px; }
 .nav a { display: grid; grid-template-columns: 8px 1fr auto; gap: 10px; align-items: center; height: 32px; padding: 0 8px; border-radius: var(--radius-s); color: var(--ink-2); font-size: 13.5px; }
 .nav a:hover { background: var(--hover); color: var(--ink); }
@@ -48,16 +48,16 @@ pre code { background: none; padding: 0; }
 .nav .n.has { color: var(--new); font-weight: 600; }
 .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; flex: none; }
 .side .foot { margin-top: auto; padding-top: 12px; }
-.main { padding: 28px 36px 64px; width: 100%; max-width: 920px; min-width: 0; }
+.main { padding: 24px 36px 64px; width: 100%; max-width: 920px; min-width: 0; }
 
 /* Page skeleton: identical height on every page */
-.head { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 16px; min-height: 56px; margin-bottom: 20px; }
-.head .crumb { font-size: 12px; color: var(--muted); height: 18px; display: flex; align-items: center; gap: 6px; }
+.head { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 16px; margin-bottom: 20px; }
+.head .crumb { font-size: 12.5px; color: var(--muted); height: 20px; line-height: 20px; margin-bottom: 8px; display: flex; align-items: center; gap: 6px; }
 .head .crumb a:hover { color: var(--ink); }
 .head h1 { font-size: 20px; font-weight: 600; letter-spacing: -0.3px; line-height: 28px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .head .meta { font-size: 13px; color: var(--muted); height: 20px; line-height: 20px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.head .actions { display: flex; gap: 8px; align-items: center; padding-bottom: 2px; }
-.head .titlerow { display: flex; align-items: center; gap: 12px; min-width: 0; min-height: 48px; }
+.head .actions { display: flex; gap: 8px; align-items: center; padding-bottom: 8px; }
+.head .titlerow { display: flex; align-items: center; gap: 14px; min-width: 0; min-height: 48px; }
 
 /* Panels */
 .panel { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); margin-bottom: 16px; min-width: 0; }
@@ -212,8 +212,8 @@ dt { color: var(--muted); } dd { margin: 0; overflow-wrap: anywhere; }
   .nav .n { min-width: 0; margin-left: 2px; } .nav .n:empty { display: none; }
   .nav a.new-app .plus { display: none; } .nav a.new-app { padding-left: 10px; }
   .nav a[href="/security"] > span:first-child { display: none; } .nav a[href="/security"] { padding-left: 10px; }
-  .main { padding: 18px 16px 48px; }
-  .head { grid-template-columns: 1fr; gap: 10px; min-height: 0; margin-bottom: 16px; }
+  .main { padding: 16px 16px 48px; }
+  .head { grid-template-columns: 1fr; gap: 10px; margin-bottom: 16px; }
   .head .actions { padding: 0; }
   .head .actions:empty { display: none; }
   .stats { grid-template-columns: 1fr 1fr; gap: 10px; }
@@ -221,6 +221,7 @@ dt { color: var(--muted); } dd { margin: 0; overflow-wrap: anywhere; }
   .filters { grid-template-columns: 1fr 1fr; gap: 8px; padding: 12px 16px; }
   .filters .q { grid-column: 1 / -1; }
   .filters .reset { justify-self: end; }
+  .filters .reset:not(.show) { display: none; }
   .panel > .pad, .rows .r, .facts > div { padding-left: 16px; padding-right: 16px; }
   .panel-head { padding: 8px 16px; }
   .rows .r { grid-template-columns: minmax(0, 1fr) !important; row-gap: 6px; }
