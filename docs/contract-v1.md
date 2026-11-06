@@ -157,6 +157,27 @@ Client status mapping used by the SDK: 429 → `.rateLimited`; 400/413/415/422 �
 
 `attachment` is `null` when none was sent or after retention expiry. `key` is the per-app issue key (project prefix + per-project sequence number); new feedback starts in `todo`. Workflow: `todo` → `in_progress` → `done`, or `wont_do`.
 
+### Operator auth for external dashboards
+
+For a front end that keeps its own session (the Next.js dashboard), the admin
+API runs the checks and ceremonies; the caller supplies its own relying party,
+which must be on the Worker's `ALLOWED_RP_IDS` allow-list (the Worker's own
+host and `localhost` are always allowed). All behind the admin bearer.
+
+| Method & path | Body | Returns |
+|---|---|---|
+| `POST /api/v1/auth/password` | `{ "password" }` | `{ "ok": true }` or `401 invalid_password` |
+| `GET /api/v1/auth/passkeys` | | `{ "passkeys": [Passkey] }` |
+| `POST /api/v1/auth/passkeys/registration-options` | `{ "rp_id", "origin" }` | WebAuthn creation options |
+| `POST /api/v1/auth/passkeys` | `{ "rp_id", "origin", "challenge", "name", "response" }` | `201 { "passkey" }` or `422 passkey_rejected` |
+| `DELETE /api/v1/auth/passkeys/:id` | | `{ "ok": true }` |
+| `POST /api/v1/auth/passkeys/authentication-options` | `{ "rp_id", "origin" }` | WebAuthn request options or `404 no_passkeys` |
+| `POST /api/v1/auth/passkeys/authenticate` | `{ "rp_id", "origin", "challenge", "response" }` | `{ "ok": true, "passkey": { id, name } }` or `401 passkey_rejected` |
+
+The caller keeps the challenge between the two calls (a short-lived signed
+cookie). Passkeys are bound to the relying party, so a passkey enrolled on
+one dashboard host does not sign in on another.
+
 ## Webhook event `feedback.created`
 
 Sent to every enabled `webhook` destination whose `categories` filter is
